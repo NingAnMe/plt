@@ -9,7 +9,6 @@ collocation_map:
   polar:
    - [60, 90, -180, 180]  # 北极范围
    - [-60, -90, -180, 180] # 南极范围
-  nadir: None
   days: 1
 
 
