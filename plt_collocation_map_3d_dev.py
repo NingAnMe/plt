@@ -186,7 +186,7 @@ def draw_butterfly(sat1Nm, sat2Nm,
     elif map_range[1]:
         fig = plt.figure(figsize=(8, 5), dpi=100)  # china
         plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
-        ax3 = plt.subplot2grid((1, 2), (1, 0), colspan=2)
+        ax3 = plt.subplot2grid((1, 2), (0, 0), colspan=2)
 
         # 画区域
         area_range = map_range[1]  # 区域范围
