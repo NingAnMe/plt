@@ -183,6 +183,17 @@ def draw_butterfly(sat1Nm, sat2Nm,
         m = drawFig_map(ax2, "south", polar_range)
         plot_matchpoint(m, lons, lats, COLORS[0])
 
+    elif map_range[1]:
+        fig = plt.figure(figsize=(8, 5), dpi=100)  # china
+        plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
+        ax3 = plt.subplot2grid((1, 2), (1, 0), colspan=2)
+
+        # 画区域
+        area_range = map_range[1]  # 区域范围
+        m = drawFig_map(ax3, "area", area_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
+
+
     # ---------legend-----------
     circle1 = mpatches.Circle((58, 36), 6, color=RED, ec=EDGE_GRAY, lw=0.3)
 #     circle_lst = [circle1]
