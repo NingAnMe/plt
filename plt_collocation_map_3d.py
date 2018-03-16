@@ -140,31 +140,51 @@ def draw_butterfly(sat1Nm, sat2Nm,
     """
     画 FY3X 匹配蝴蝶图
     """
-    print('date, lons_count, lats_count', ymd_e, len(lons), len(lats))
+    print('date, lons, lats', ymd_e, len(lons), len(lats))
 #     COLORS = ['#4cd964', '#1abc9c', '#5ac8fa', '#007aff', '#5856d6']
     COLORS = [RED]
-    fig = plt.figure(figsize=(8, 10), dpi=100)  # china
-#     plt.subplots_adjust(left=0.11, right=0.91, bottom=0.12, top=0.92)
-    plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
+    if map_range[0] and map_range[1]:
+        fig = plt.figure(figsize=(8, 10), dpi=100)  # china
+        plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
+        ax1 = plt.subplot2grid((2, 2), (0, 0))
+        ax2 = plt.subplot2grid((2, 2), (0, 1))
+        ax3 = plt.subplot2grid((2, 2), (1, 0), colspan=2)
 
-    ax1 = plt.subplot2grid((2, 2), (0, 0))
-    ax2 = plt.subplot2grid((2, 2), (0, 1))
-    ax3 = plt.subplot2grid((2, 2), (1, 0), colspan=2)
+        # 画两极
+        polar_range = map_range[0]  # 两极范围
+        m = drawFig_map(ax1, "north", polar_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
+        m = drawFig_map(ax2, "south", polar_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
 
-    # 两极范围
-    polar_range = map_range[0]
+        # 画区域
+        area_range = map_range[1]  # 区域范围
+        m = drawFig_map(ax3, "area", area_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
 
-    m = drawFig_map(ax1, "north", polar_range)
-    plot_matchpoint(m, lons, lats, COLORS[0])
+    elif map_range[0]:
+        fig = plt.figure(figsize=(8, 5), dpi=100)  # china
+        plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
+        ax1 = plt.subplot2grid((1, 2), (0, 0))
+        ax2 = plt.subplot2grid((1, 2), (0, 1))
 
-    m = drawFig_map(ax2, "south", polar_range)
-    plot_matchpoint(m, lons, lats, COLORS[0])
+        # 画两极
+        polar_range = map_range[0]  # 两极范围
+        m = drawFig_map(ax1, "north", polar_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
+        m = drawFig_map(ax2, "south", polar_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
 
-    # 区域范围
-    area_range = map_range[1]
+    elif map_range[1]:
+        fig = plt.figure(figsize=(8, 5), dpi=100)  # china
+        plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
+        ax3 = plt.subplot2grid((1, 2), (0, 0), colspan=2)
 
-    m = drawFig_map(ax3, "area", area_range)
-    plot_matchpoint(m, lons, lats, COLORS[0])
+        # 画区域
+        area_range = map_range[1]  # 区域范围
+        m = drawFig_map(ax3, "area", area_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
+
 
     # ---------legend-----------
     circle1 = mpatches.Circle((58, 36), 6, color=RED, ec=EDGE_GRAY, lw=0.3)
@@ -173,30 +193,22 @@ def draw_butterfly(sat1Nm, sat2Nm,
 #         circle_lst.append(mpatches.Circle((219 + i * 7, 36), 6, color=COLORS[i], ec=EDGE_GRAY, lw=0.3))
 #     fig.patches.extend(circle_lst)
 
+    # 对整张图片添加文字
     TEXT_Y = 0.05
     fig.text(0.1, TEXT_Y, '%s' % sat1Nm, color=RED, fontproperties=FONT0)
-#     fig.text(0.34, TEXT_Y, '%s' % sat2Nm, color=BLUE, fontproperties=FONT0)
     if ymd_s != ymd_e:
         fig.text(0.55, TEXT_Y, '%s-%s' % (ymd_s, ymd_e), fontproperties=FONT0)
     else:
         fig.text(0.55, TEXT_Y, '%s' % ymd_s, fontproperties=FONT0)
     fig.text(0.83, TEXT_Y, ORG_NAME, fontproperties=FONT0)
 
-    # 设定Map边框粗细
-    spines = ax1.spines
-    for eachspine in spines:
-        spines[eachspine].set_linewidth(0)
-    spines = ax2.spines
-    for eachspine in spines:
-        spines[eachspine].set_linewidth(0)
-    spines = ax3.spines
-    for eachspine in spines:
-        spines[eachspine].set_linewidth(0)
+
     pb_io.make_sure_path_exists(os.path.dirname(out_fig_file))
     fig.savefig(out_fig_file, dpi=100)
 
     fig.clear()
     plt.close()
+
 
 def drawFig_map(ax, n_s, range):
     '''
@@ -293,7 +305,15 @@ def drawFig_map(ax, n_s, range):
                         fontproperties=TICKER_FONT)
             ax.set_title("Southern Hemisphere", fontproperties=FONT0)
 
+    # 设置 Map 边框粗细
+
+    spines = ax.spines
+    for eachspine in spines:
+        spines[eachspine].set_linewidth(0)
+
+
     return m
+
 
 def plot_matchpoint(m, lons, lats, color, alpha=1):
     # plot
