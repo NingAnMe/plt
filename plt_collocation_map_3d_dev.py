@@ -170,18 +170,18 @@ def draw_butterfly(sat1Nm, sat2Nm,
         m = drawFig_map(ax3, "area", area_range)
         plot_matchpoint(m, lons, lats, COLORS[0])
 
-    # elif map_range[0]:
-    #     fig = plt.figure(figsize=(8, 5), dpi=100)  # china
-    #     plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
-    #     ax1 = plt.subplot2grid((1, 2), (0, 0))
-    #     ax2 = plt.subplot2grid((1, 2), (0, 1))
-    #
-    #     # 画两极
-    #     polar_range = map_range[0]  # 两极范围
-    #     m = drawFig_map(ax1, "north", polar_range)
-    #     plot_matchpoint(m, lons, lats, COLORS[0])
-    #     m = drawFig_map(ax2, "south", polar_range)
-    #     plot_matchpoint(m, lons, lats, COLORS[0])
+    elif map_range[0]:
+        fig = plt.figure(figsize=(8, 5), dpi=100)  # china
+        plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
+        ax1 = plt.subplot2grid((1, 2), (0, 0))
+        ax2 = plt.subplot2grid((1, 2), (0, 1))
+
+        # 画两极
+        polar_range = map_range[0]  # 两极范围
+        m = drawFig_map(ax1, "north", polar_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
+        m = drawFig_map(ax2, "south", polar_range)
+        plot_matchpoint(m, lons, lats, COLORS[0])
 
     # ---------legend-----------
     circle1 = mpatches.Circle((58, 36), 6, color=RED, ec=EDGE_GRAY, lw=0.3)
