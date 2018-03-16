@@ -151,9 +151,10 @@ def draw_butterfly(sat1Nm, sat2Nm,
     print('date, lons, lats', ymd_e, len(lons), len(lats))
 #     COLORS = ['#4cd964', '#1abc9c', '#5ac8fa', '#007aff', '#5856d6']
     COLORS = [RED]
+    if map_range[0] and map_range[1]:
+
     fig = plt.figure(figsize=(8, 10), dpi=100)  # china
     plt.subplots_adjust(left=0.09, right=0.93, bottom=0.12, top=0.94)
-
     ax1 = plt.subplot2grid((2, 2), (0, 0))
     ax2 = plt.subplot2grid((2, 2), (0, 1))
     ax3 = plt.subplot2grid((2, 2), (1, 0), colspan=2)
@@ -182,27 +183,15 @@ def draw_butterfly(sat1Nm, sat2Nm,
 #         circle_lst.append(mpatches.Circle((219 + i * 7, 36), 6, color=COLORS[i], ec=EDGE_GRAY, lw=0.3))
 #     fig.patches.extend(circle_lst)
 
+    # 对整张图片添加文字
     TEXT_Y = 0.05
     fig.text(0.1, TEXT_Y, '%s' % sat1Nm, color=RED, fontproperties=FONT0)
-#     fig.text(0.34, TEXT_Y, '%s' % sat2Nm, color=BLUE, fontproperties=FONT0)
     if ymd_s != ymd_e:
         fig.text(0.55, TEXT_Y, '%s-%s' % (ymd_s, ymd_e), fontproperties=FONT0)
     else:
         fig.text(0.55, TEXT_Y, '%s' % ymd_s, fontproperties=FONT0)
     fig.text(0.83, TEXT_Y, ORG_NAME, fontproperties=FONT0)
 
-    # 设定Map边框粗细
-    print('spine start')
-    spines = ax1.spines
-    for eachspine in spines:
-        spines[eachspine].set_linewidth(0)
-    spines = ax2.spines
-    for eachspine in spines:
-        spines[eachspine].set_linewidth(0)
-    spines = ax3.spines
-    for eachspine in spines:
-        spines[eachspine].set_linewidth(0)
-    print('spine end')
     print('out start')
     pb_io.make_sure_path_exists(os.path.dirname(out_fig_file))
     fig.savefig(out_fig_file, dpi=100)
@@ -229,7 +218,7 @@ def drawFig_map(ax, n_s, range):
                     llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon,
                     resolution='c', area_thresh=10000.,
                     projection='cyl', lat_ts=20., ax=ax)
-        print('area 0')
+        print('area success')
         m.fillcontinents(color=GRAY)
 
         # draw parallels
@@ -259,14 +248,14 @@ def drawFig_map(ax, n_s, range):
             north_range = int(north_range[0])
             m = Basemap(projection='npaeqd', boundinglat=north_range-1,
                         lon_0=0, resolution='c', ax=ax)
-            print('north 1')
+            print('north success')
         elif n_s == "south":
             print('south range', range)
             south_range = range[1]
             south_range = int(south_range[0])
             m = Basemap(projection='spaeqd', boundinglat=south_range+1,
                         lon_0=180, resolution='c', ax=ax)
-            print('south 1')
+            print('south success')
 
         m.fillcontinents(color=GRAY)
 
@@ -304,6 +293,13 @@ def drawFig_map(ax, n_s, range):
                 ax.text(xpt + 500000, ypt + 200000, str(lat)[1:3] + u'°S',
                         fontproperties=TICKER_FONT)
             ax.set_title("Southern Hemisphere", fontproperties=FONT0)
+
+    # 设置 Map 边框粗细
+    print('spine start')
+    spines = ax.spines
+    for eachspine in spines:
+        spines[eachspine].set_linewidth(0)
+    print('spine end')
 
     return m
 
