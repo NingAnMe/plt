@@ -122,9 +122,9 @@ def run(pair1, pair2, date_s, date_e):
         else:
             # plot latest year
             ymd_s = date_s.strftime("%Y%m%d")
-            ymd_e = date_s.strftime("%Y%m%d")
-            picPath = os.path.join(DBB_DIR, '%s_%s' % (pair1, satsen22), ymd_e,
-                        '%s_%s_DoubleBias_%s_Year_%s_%dK.png' % (pair1, satsen22, ch, ymd_e, ref_temp))
+            ymd_e = date_e.strftime("%Y%m%d")
+            picPath = os.path.join(DBB_DIR, '%s_%s' % (pair1, satsen22), ymd_s,
+                        '%s_%s_DoubleBias_%s_Year_%s_%dK.png' % (pair1, satsen22, ch, ymd_s, ref_temp))
         plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e)
 
     Log.info(u'Success')
