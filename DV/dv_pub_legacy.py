@@ -366,11 +366,11 @@ def draw_Scatter_Bar(x, y, filename, titledict, tl_list, tr_list, part1, part2, 
         # 20180313 徐娜要改为（-4，4） --------------------------
         ax3.set_ylim(-4, 4)
         ax3.yaxis.set_major_locator(MultipleLocator(2))
-        ax3.yaxis.set_minor_locator(MultipleLocator(0.5))
+        ax3.yaxis.set_minor_locator(MultipleLocator(0.4))
     elif xname == "ref":
         ax3.set_ylim(-0.08, 0.081)
         ax3.yaxis.set_major_locator(MultipleLocator(0.04))
-        ax3.yaxis.set_minor_locator(MultipleLocator(0.01))
+        ax3.yaxis.set_minor_locator(MultipleLocator(0.008))
     delta = x - y
     # 添加y=0的线
     COLOR_Darkgray = '#888888'
