@@ -101,8 +101,9 @@ def run(pair1, pair2, date_s, date_e):
     if len(date_D) == 0:
         return
     print(nc1.channel_name)
+    chans = ['CH_20', 'CH_21', 'CH_22', 'CH_23', 'CH_24', 'CH_25']
     for k, ch in enumerate(chans):
-        ch = "CH_%02d" % (k + 1)
+        ch = chans[k]
         ref_temp = reftmp[k]
         tb1 = tbbias1[index1, k]
         tb2 = tbbias2[index2, k]
