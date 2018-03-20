@@ -100,7 +100,7 @@ def run(pair1, pair2, date_s, date_e):
 
     if len(date_D) == 0:
         return
-    print(nc1.channel_name)
+
     chans = ['CH_20', 'CH_21', 'CH_22', 'CH_23', 'CH_24', 'CH_25']
     for k, ch in enumerate(chans):
         ch = chans[k]
@@ -246,11 +246,9 @@ class stdNC():
         self.tbbias = None
         self.time = None
         self.reftmp = None
-        self.channel_name = None
 
     def LoadData(self, i_file):
         noError = True
-        print i_file
         if not os.path.isfile(i_file):
             Log.error("%s not exist!" % i_file)
             return False
