@@ -100,8 +100,8 @@ def run(pair1, pair2, date_s, date_e):
 
     if len(date_D) == 0:
         return
-
-    for k in xrange(chans):
+    print(nc1.channel_name)
+    for k, ch in enumerate(chans):
         ch = "CH_%02d" % (k + 1)
         ref_temp = reftmp[k]
         tb1 = tbbias1[index1, k]
@@ -245,6 +245,7 @@ class stdNC():
         self.tbbias = None
         self.time = None
         self.reftmp = None
+        self.channel_name = None
 
     def LoadData(self, i_file):
         noError = True
@@ -257,6 +258,7 @@ class stdNC():
             ncFile = netCDF4.Dataset(i_file, 'r', format='NETCDF4')
             self.tbbias = ncFile["std_scene_tb_bias"][:]
             self.time = ncFile["date"][:]
+            self.channel = ncFile["channel_name"][:]
             self.reftmp = ncFile["std_scene_tb"][:]
             ncFile.close()
         except:
