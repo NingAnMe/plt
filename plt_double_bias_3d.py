@@ -65,11 +65,11 @@ def run(pair1, pair2, date_s, date_e):
     tbbias1 = nc1.tbbias
     tbbias2 = nc2.tbbias
     reftmp = nc1.reftmp
-    sat1, sen1 = satsen11.split("+")
-    
+
     if date_s is None:  # TODO:
 #         timestamp_s = max(time1[0], time2[0])
 #         date_s = datetime.fromtimestamp(timestamp_s, tz=pytz.utc)
+        sat1, sen1 = satsen11.split("+")
         date_s = pb_time.ymd2date(inCfg["LUANCH_DATE"][sat1])
     date_s = pytz.utc.localize(date_s)
     timestamp_s = calendar.timegm(date_s.timetuple())
@@ -102,10 +102,7 @@ def run(pair1, pair2, date_s, date_e):
         return
 
     for k in xrange(chans):
-        if sat1.startswith("FY2"):
-            ch = "CH_%02d" % (k + 1)
-        elif sat1.startswith("FY4"):
-            ch = "CH_%02d" % (k + 8)
+        ch = "CH_%02d" % (k + 1)
         ref_temp = reftmp[k]
         tb1 = tbbias1[index1, k]
         tb2 = tbbias2[index2, k]
@@ -127,11 +124,11 @@ def run(pair1, pair2, date_s, date_e):
             ymd_e = date_s.strftime("%Y%m%d")
             picPath = os.path.join(DBB_DIR, '%s_%s' % (pair1, satsen22), ymd_e,
                         '%s_%s_DoubleBias_%s_Year_%s_%dK.png' % (pair1, satsen22, ch, ymd_e, ref_temp))
-        plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, sat1)
+        plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e)
 
     Log.info(u'Success')
 
-def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, sat1):
+def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     '''
     画偏差时序折线图
     '''
@@ -154,11 +151,8 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, 
     xlim_min = date_s
     xlim_max = date_e
     plt.xlim(xlim_min, xlim_max)
-    if sat1.startswith("FY2"):
-        plt.ylim(-4, 4)
-    elif sat1.startswith("FY4"):
-        plt.ylim(-1, 1)
-    
+    plt.ylim(-4, 4)
+
     ax = plt.gca()
     # format the ticks
     setXLocator(ax, xlim_min, xlim_max)
@@ -254,7 +248,7 @@ class stdNC():
 
     def LoadData(self, i_file):
         noError = True
-        # print i_file
+        print i_file
         if not os.path.isfile(i_file):
             Log.error("%s not exist!" % i_file)
             return False
