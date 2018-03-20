@@ -3,7 +3,7 @@
 Created on 2016年1月6日
 读取匹配后的NC文件，画散点回归图，生成abr文件
 
-@author: duxiang, zhangtao
+@author: duxiang, zhangtao, anning
 '''
 import os, sys
 from configobj import ConfigObj
@@ -16,16 +16,18 @@ from DV.dv_pub_legacy import plt, mdates, set_tick_font, FONT0
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 import pytz
 import calendar
-from multiprocessing import Pool , Lock
+from multiprocessing import Pool, Lock
+from plt_io import loadYamlCfg
+
 
 def run(pair1, pair2, date_s, date_e):
-    '''
+    """
     pair: sat1+sensor1_sat2+sensor2
     date_s: datetime of start date
             None  处理 从发星 到 有数据的最后一天
     date_e: datetime of end date
             None  处理 从发星 到 有数据的最后一天
-    '''
+    """
     Log.info(u'开始运行双差统计图绘制程序%s %s-----------------' % (pair1, pair2))
     isLaunch = False
     if date_s is None or date_e is None:
@@ -37,6 +39,15 @@ def run(pair1, pair2, date_s, date_e):
     if satsen11 != satsen21:
         Log.error("%s and %s not the same, can't do double bias" % (satsen11, satsen21))
         return
+
+    # 读取传感器对的配置文件
+    sat11, sen11 = satsen11.split('+')
+    sat12, sen12 = satsen12.split('+')
+
+    plt_cfg_file = os.path.join(MainPath, '%s_%s_3d.yaml' % (sen11, sen12))
+    plt_cfg = loadYamlCfg(plt_cfg_file)
+
+    chans = plt_cfg["rad-rad"]["chan"]
 
     # change sensor Name
     if "VISSR" in satsen11:  # VISSR -> SVISSR
@@ -81,8 +92,9 @@ def run(pair1, pair2, date_s, date_e):
         date_e = pytz.utc.localize(date_e)
         timestamp_e = calendar.timegm(date_e.timetuple())
 
-    days1, chans = tbbias1.shape
-    days2, chans = tbbias2.shape
+    days1 = tbbias1.shape[0]
+    days2 = tbbias2.shape[0]
+
     index1 = []
     index2 = []
     date_D = []
@@ -101,7 +113,6 @@ def run(pair1, pair2, date_s, date_e):
     if len(date_D) == 0:
         return
 
-    chans = ['CH_20', 'CH_21', 'CH_22', 'CH_23', 'CH_24', 'CH_25']
     for k, ch in enumerate(chans):
         ch = chans[k]
         ref_temp = reftmp[k]
@@ -129,10 +140,11 @@ def run(pair1, pair2, date_s, date_e):
 
     Log.info(u'Success')
 
+
 def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
-    '''
+    """
     画偏差时序折线图
-    '''
+    """
     fig = plt.figure(figsize=(6, 4))
 #     plt.subplots_adjust(left=0.13, right=0.95, bottom=0.11, top=0.97)
 
@@ -186,6 +198,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     fig.clear()
     plt.close()
 
+
 def setXLocator(ax, xlim_min, xlim_max):
     day_range = (xlim_max - xlim_min).days
 #     if day_range <= 2:
@@ -218,10 +231,11 @@ def setXLocator(ax, xlim_min, xlim_max):
         if month_range <= 48:
             add_year_xaxis(ax, xlim_min, xlim_max)
 
+
 def add_year_xaxis(ax, xlim_min, xlim_max):
-    '''
+    """
     add year xaxis
-    '''
+    """
     if xlim_min.year == xlim_max.year:
         ax.set_xlabel(xlim_min.year, fontsize=11, fontproperties=FONT0)
         return
@@ -240,6 +254,7 @@ def add_year_xaxis(ax, xlim_min, xlim_max):
     newax.tick_params(which='both', direction='in')
     set_tick_font(newax)
     newax.xaxis.set_tick_params(length=5)
+
 
 class stdNC():
     def __init__(self):
@@ -264,6 +279,7 @@ class stdNC():
             noError = False
             Log.error("NC corrupted: %s" % i_file)
         return noError
+
 
 def month_mean(dateLst, v):
     v = np.array(v)
@@ -308,7 +324,7 @@ cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 
 # 配置不存在预警
 if not os.path.isfile(cfgFile):
-    print (u'配置文件不存在 %s' % cfgFile)
+    print u'配置文件不存在 %s' % cfgFile
     sys.exit(-1)
 # 载入配置文件
 inCfg = ConfigObj(cfgFile)
