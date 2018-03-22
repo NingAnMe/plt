@@ -166,14 +166,14 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     xlim_min = date_s
     xlim_max = date_e
     plt.xlim(xlim_min, xlim_max)
-    plt.ylim(-4, 4)
+    plt.ylim(-1, 1)
 
     ax = plt.gca()
     # format the ticks
     setXLocator(ax, xlim_min, xlim_max)
     set_tick_font(ax)
-    ax.yaxis.set_major_locator(MultipleLocator(1))
-    ax.yaxis.set_minor_locator(MultipleLocator(0.5))
+    ax.yaxis.set_major_locator(MultipleLocator(0.25))
+    ax.yaxis.set_minor_locator(MultipleLocator(0.125))
 
     # title
     plt.title(title, fontsize=12, fontproperties=FONT0)
