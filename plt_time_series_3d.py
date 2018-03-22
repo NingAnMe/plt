@@ -236,8 +236,8 @@ def run(pair, date_s, date_e):
                     bias_D = ref_temp_f - (ref_temp_f * a_D + b_D)
                     bias_M = ref_temp_f - (ref_temp_f * a_M + b_M)
 
-                    title = 'Time Series of Brightness Temperature Bias Between\n%s  %s  %s  %sK' % \
-                            (pair, chan, DayOrNight, ref_temp)
+                    title = 'Time Series of Brightness Temperature Bias \n%s Minus %s %s %s %sK' % \
+                            (part1, part2, chan, DayOrNight, ref_temp)
                     if isLaunch:
                         picPath = os.path.join(OMB_DIR, pair,
                                            '%s_TBBias_%s_%s_Launch_%dK.png' % (pair, chan, DayOrNight, ref_temp))
