@@ -14,6 +14,7 @@ from PB.CSC.pb_csc_console import LogServer
 from datetime import datetime
 from DV.dv_pub_legacy import plt, mdates, set_tick_font, FONT0
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
+from matplotlib.ticker import MultipleLocator
 import pytz
 import calendar
 from multiprocessing import Pool, Lock
@@ -145,6 +146,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     """
     画偏差时序折线图
     """
+    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
 #     plt.subplots_adjust(left=0.13, right=0.95, bottom=0.11, top=0.97)
 
@@ -170,6 +172,8 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     # format the ticks
     setXLocator(ax, xlim_min, xlim_max)
     set_tick_font(ax)
+    ax.yaxis.set_major_locator(MultipleLocator(1))
+    ax.yaxis.set_minor_locator(MultipleLocator(0.5))
 
     # title
     plt.title(title, fontsize=12, fontproperties=FONT0)
@@ -320,6 +324,8 @@ if '-h' in args:
 # 获取程序所在位置，拼接配置文件
 MainPath, MainFile = os.path.split(os.path.realpath(__file__))
 ProjPath = os.path.dirname(MainPath)
+omPath = os.path.dirname(ProjPath)
+dvPath = os.path.join(os.path.dirname(omPath), 'DV')
 cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 
 # 配置不存在预警
