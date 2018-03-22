@@ -126,8 +126,8 @@ def run(pair1, pair2, date_s, date_e):
 
         date_M, bias_M = month_mean(date_D, bias_D)
 
-        title = 'Time Series of Double Bias Between\n%s  %s  %s  %s  %dK' % \
-                (satsen11, satsen12, satsen22, ch, ref_temp)
+        title = 'Time Series of Double Bias \n%s_%s Miuns %s_%s %s %dK' % \
+                (satsen11, satsen12, satsen11, satsen22, ch, ref_temp)
         if isLaunch:
             picPath = os.path.join(DBB_DIR, '%s_%s' % (pair1, satsen22),
                         '%s_%s_DoubleBias_%s_Launch_%dK.png' % (pair1, satsen22, ch, ref_temp))
