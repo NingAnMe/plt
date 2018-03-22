@@ -264,9 +264,10 @@ def run(pair, date_s, date_e):
                          picPath, title, date_s, date_e)
 
 def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, satName):
-    '''
+    """
     画偏差时序折线图
-    '''
+    """
+    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
 #     plt.subplots_adjust(left=0.13, right=0.95, bottom=0.11, top=0.97)
 
@@ -297,6 +298,8 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, 
     # format the ticks
     setXLocator(ax, xlim_min, xlim_max)
     set_tick_font(ax)
+    ax.yaxis.set_major_locator(MultipleLocator(1))
+    ax.yaxis.set_minor_locator(MultipleLocator(0.5))
 
     # title
     plt.title(title, fontsize=12, fontproperties=FONT0)
@@ -386,7 +389,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
              date_s, date_e,
              slope_min, slope_max,
              var):
-
+    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
     fig = plt.figure(figsize=(6, 6))
     ax1 = plt.subplot(311)
     ax2 = plt.subplot(312, sharex=ax1)
@@ -402,20 +405,20 @@ def plot_abc(date_D, a_D, b_D, c_D,
     if var == "tbb-tbb" or var == "ref-ref":
         ax1.set_ylim(slope_min, slope_max)
         ax1.yaxis.set_major_locator(MultipleLocator(0.01))
-        ax1.yaxis.set_minor_locator(MultipleLocator(0.005))
+        ax1.yaxis.set_minor_locator(MultipleLocator(0.002))
     elif var == "dn-ref":
         ax1.set_ylim(slope_min, slope_max)
         # 根据要求：dn-ref 的图，ax1 需要有两种坐标范围
         if slope_max >= 0.00030:
-            ax1.yaxis.set_major_locator(MultipleLocator(0.00005))
-            ax1.yaxis.set_minor_locator(MultipleLocator(0.000025))
+            ax1.yaxis.set_major_locator(MultipleLocator(0.00010))
+            ax1.yaxis.set_minor_locator(MultipleLocator(0.00002))
         else:
             ax1.yaxis.set_major_locator(MultipleLocator(0.00002))
-            ax1.yaxis.set_minor_locator(MultipleLocator(0.00001))
+            ax1.yaxis.set_minor_locator(MultipleLocator(0.000004))
     if var == "tbb-tbb":
         ax2.set_ylim(-30, 30)
         ax2.yaxis.set_major_locator(MultipleLocator(10))
-        ax2.yaxis.set_minor_locator(MultipleLocator(2))
+        ax2.yaxis.set_minor_locator(MultipleLocator(5))
     elif var == "ref-ref":
         ax2.set_ylim(-0.1, 0.1)
         ax2.yaxis.set_major_locator(MultipleLocator(0.02))
@@ -426,7 +429,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
         ax2.yaxis.set_minor_locator(MultipleLocator(0.01))
     ax3.set_ylim(0, 7)
     ax3.yaxis.set_major_locator(MultipleLocator(1))
-    ax3.yaxis.set_minor_locator(MultipleLocator(0.2))
+    ax3.yaxis.set_minor_locator(MultipleLocator(0.5))
 
     # plot ax1 -------------------------------------------------
     plt.sca(ax1)
@@ -609,6 +612,8 @@ if '-h' in args:
 # 获取程序所在位置，拼接配置文件
 MainPath, MainFile = os.path.split(os.path.realpath(__file__))
 ProjPath = os.path.dirname(MainPath)
+omPath = os.path.dirname(ProjPath)
+dvPath = os.path.join(os.path.dirname(omPath), 'DV')
 cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 
 # 配置不存在预警
