@@ -14,11 +14,13 @@ from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 import numpy as np
-import yaml
+
 from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
 from DV import dv_pub_legacy
 from multiprocessing import Pool, Lock
+from scipy import stats
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from datetime import datetime
 from plt_io import ReadHDF5, loadYamlCfg
@@ -230,6 +232,10 @@ def run(pair, ymd, isMonthly):
                                num_file, part1, part2, chan, str_time,
                                xname, xname_l, xunit, xmin, xmax,
                                yname, yname_l, yunit, ymin, ymax, diagonal)
+                    plot_density(x_d, y_d, w_d, o_file,
+                               num_file, part1, part2, chan, str_time,
+                               xname, xname_l, xunit, xmin, xmax,
+                               yname, yname_l, yunit, ymin, ymax, diagonal)
                     print('7')
                     if abr:
                         dict_cabr_d[o_name][chan] = abr
@@ -341,6 +347,36 @@ def writeTxt(channel, part1, part2, o_name, ymd, dict_cabr, DayOrNight, isMonthl
     fp.writelines(titleLines)
     fp.writelines(allLines)
     fp.close()
+
+
+def plot_density(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
+         xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax, diagonal):
+    print('demo 3')
+    mpl.use('agg')
+
+    print('demo 4')
+    pos = np.vstack([x, y])
+    print('demo 5')
+    kernel = stats.gaussian_kde(pos)
+    print('demo 6')
+    z = kernel(pos)
+    print('demo 7')
+
+    # plot fig
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    norm = plt.Normalize()
+    norm.autoscale(z)
+    print('demo 8')
+    ax.scatter(x, y, c=z, norm=norm, s=6, marker="o", cmap=plt.cm.jet, lw=0)
+    print('demo 9')
+    ax.set_xlim([xmin, xmax])
+    ax.set_ylim([ymin, ymax])
+
+    fig_name = '%s_density_%s' % (o_file, chan)
+    print(fig_name)
+    plt.savefig(fig_name)
+    print('demo 10')
 
 
 def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
