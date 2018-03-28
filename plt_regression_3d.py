@@ -14,11 +14,13 @@ from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 import numpy as np
-import yaml
+
 from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
 from DV import dv_pub_legacy
 from multiprocessing import Pool, Lock
+
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from datetime import datetime
 from plt_io import ReadHDF5, loadYamlCfg
@@ -123,7 +125,6 @@ def run(pair, ymd, isMonthly):
             else:
                 day_index = None
                 night_index = None
-
             # 将每个对通用的属性值放到对循环，每个通道用到的属性值放到通道循环
             # get threhold, unit, names...
             xname, yname = each.split('-')
@@ -197,7 +198,6 @@ def run(pair, ymd, isMonthly):
                 if 'night' in Day_Night:
                     dict_cabr_n[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                 continue
-
             # regression starts
             if 'all' in Day_Night:
                 o_file = os.path.join(cur_path,
@@ -205,12 +205,13 @@ def run(pair, ymd, isMonthly):
                 abr = plot(x, y, weight, o_file,
                            num_file, part1, part2, chan, str_time,
                            xname, xname_l, xunit, xmin, xmax,
-                           yname, yname_l, yunit, ymin, ymax, diagonal)
+                           yname, yname_l, yunit, ymin, ymax,
+                           diagonal, isMonthly)
                 if abr:
                     dict_cabr[o_name][chan] = abr
                 else:
                     dict_cabr[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
-
+            print(each, chan)
             # ------- day ----------
             if 'day' in Day_Night:
 
@@ -219,6 +220,7 @@ def run(pair, ymd, isMonthly):
                     o_file = os.path.join(cur_path,
                                           '%s_%s_%s_Day_%s' % (pair, o_name, chan, str_time))
 
+                    print('x, y, day_index', len(x), len(y), len(day_index))
                     x_d = x[day_index]
                     y_d = y[day_index]
 
@@ -227,7 +229,8 @@ def run(pair, ymd, isMonthly):
                     abr = plot(x_d, y_d, w_d, o_file,
                                num_file, part1, part2, chan, str_time,
                                xname, xname_l, xunit, xmin, xmax,
-                               yname, yname_l, yunit, ymin, ymax, diagonal)
+                               yname, yname_l, yunit, ymin, ymax,
+                               diagonal, isMonthly)
 
                     if abr:
                         dict_cabr_d[o_name][chan] = abr
@@ -239,16 +242,17 @@ def run(pair, ymd, isMonthly):
             # ---------night ------------
             if 'night' in Day_Night:
                 if night_index is not None and np.where(night_index)[0].size > 10:
-                    #
-                    o_file = os.path.join(cur_path,
-                                          '%s_%s_%s_Night_%s' % (pair, o_name, chan, str_time))
+                    o_file = os.path.join(cur_path, '%s_%s_%s_Night_%s' % (
+                        pair, o_name, chan, str_time))
+
                     x_n = x[night_index]
                     y_n = y[night_index]
                     w_n = weight[night_index] if weight is not None else None
                     abr = plot(x_n, y_n, w_n, o_file,
                                num_file, part1, part2, chan, str_time,
                                xname, xname_l, xunit, xmin, xmax,
-                               yname, yname_l, yunit, ymin, ymax, diagonal)
+                               yname, yname_l, yunit, ymin, ymax,
+                               diagonal, isMonthly)
                     if abr:
                         dict_cabr_n[o_name][chan] = abr
                     else:
@@ -262,21 +266,25 @@ def run(pair, ymd, isMonthly):
         channel = plt_cfg[each]['chan']
         if 'all' in Day_Night:
             for o_name in dict_cabr:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr, 'ALL', isMonthly)
+                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr,
+                         'ALL', isMonthly)
         if 'day' in Day_Night:
             for o_name in dict_cabr_d:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_d, 'Day', isMonthly)
+                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_d,
+                         'Day', isMonthly)
         if 'night' in Day_Night:
             for o_name in dict_cabr_n:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_n, 'Night', isMonthly)
+                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_n,
+                         'Night', isMonthly)
         lock.release()
 
 
-def writeTxt(channel, part1, part2, o_name, ymd, dict_cabr, DayOrNight, isMonthly):
-    '''
+def writeTxt(channel, part1, part2, o_name, ymd,
+             dict_cabr, DayOrNight, isMonthly):
+    """
     生成abr文件
     ymd: YYYYMMDD or YYYYMM
-    '''
+    """
     if len(ymd) == 6:
         ymd = ymd + '01'
     if isMonthly:
@@ -342,7 +350,8 @@ def writeTxt(channel, part1, part2, o_name, ymd, dict_cabr, DayOrNight, isMonthl
 
 
 def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
-         xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax, diagonal):
+         xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax,
+         diagonal, isMonthly):
     plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
 
     titleName = '%s-%s' % (xname.upper(), yname.upper())
@@ -383,23 +392,36 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     pb_io.make_sure_path_exists(os.path.dirname(o_file))
 
     if diagonal:
-        dv_pub_legacy.draw_Scatter_Bar(x, y,
-                                       o_file, DictTitle_rad,
-                                       [['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
-                                         '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
-                                         '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-                                         '{:15}: {:7d}'.format('Number', length_rad)]], '',
-                                       part1, part2, xname, xname_l,
-                                       xmin, xmax, ymin, ymax)
+        dv_pub_legacy.draw_Scatter_Bar(
+            x, y,
+            o_file, DictTitle_rad,
+            [['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+              '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+              '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+              '{:15}: {:7d}'.format('Number', length_rad)]], '',
+            part1, part2, xname, xname_l,
+            xmin, xmax, ymin, ymax)
 
     else:
-        dv_pub_legacy.draw_Scatter(x, y,
-                                   o_file, DictTitle_rad,
-                                   [['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
-                                     '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
-                                     '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-                                     '{:15}: {:7d}'.format('Number', length_rad)]], '',
-                                   xmin, xmax, ymin, ymax, diagonal)
+        dv_pub_legacy.draw_Scatter(
+            x, y,
+            o_file, DictTitle_rad,
+            [['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+             '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+             '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+             '{:15}: {:7d}'.format('Number', length_rad)]], '',
+            xmin, xmax, ymin, ymax, diagonal)
+    if isMonthly:
+        o_file = o_file + "_density"
+        dv_pub_legacy.draw_density(
+            x, y,
+            o_file, DictTitle_rad,
+            [['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+             '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+             '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+             '{:15}: {:7d}'.format('Number', length_rad)]], '',
+            xmin, xmax, ymin, ymax, diagonal)
+
     return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]  # num, a, b, r
 
 
