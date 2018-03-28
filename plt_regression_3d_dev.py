@@ -415,6 +415,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
              '{:15}: {:7d}'.format('Number', length_rad)]], '',
             xmin, xmax, ymin, ymax, diagonal)
     if isMonthly:
+        o_file = o_file + "_density"
         dv_pub_legacy.draw_density(
             x, y,
             o_file, DictTitle_rad,
