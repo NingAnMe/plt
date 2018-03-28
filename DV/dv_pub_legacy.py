@@ -12,6 +12,7 @@ from PB import pb_io
 mpl.use('Agg')
 import numpy as np
 from math import floor, ceil
+from scipy import stats
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from matplotlib.font_manager import FontProperties
@@ -454,6 +455,70 @@ def draw_Scatter_withColorbar(x, y, filename, titledict, tl_list, tr_list):
     fig.clear()
     plt.close()
     return
+
+
+def draw_density(x, y, filename, titledict, tl_list, tr_list,
+                 xmin=None, xmax=None, ymin=None, ymax=None, diagonal=True):
+    """
+    绘制密度图
+    :return:
+    """
+    ab = np.polyfit(x, y, 1)
+    if None in [xmin, xmax, ymin, ymax]:
+        xmin = floor(np.min(x))
+        xmax = ceil(np.max(x))
+        ymin = floor(np.min(y))
+        ymax = ceil(np.max(y))
+
+    fig = plt.figure(figsize=(6, 4))
+    fig.subplots_adjust(top=0.93, bottom=0.12, left=0.11, right=0.96)
+
+    plt.grid(True)
+
+    # 对角线
+    if diagonal:
+        # 设定x y 轴的范围
+        xylimMax = max(xmax, ymax)
+        xylimMin = min(xmin, ymin)
+        plt.xlim(xylimMin, xylimMax)
+        plt.ylim(xylimMin, xylimMax)
+        xmax = xylimMax
+        xmin = xylimMin
+        plt.plot([xylimMin, xylimMax], [xylimMin, xylimMax], color='#cccccc', linewidth=0.6)
+
+    else:
+        # 设定x y 轴的范围
+        plt.xlim(xmin, xmax)
+        plt.ylim(ymin, ymax)
+
+    # 回归线
+
+    plt.plot([xmin, xmax], [ab[0] * xmin + ab[1], ab[0] * xmax + ab[1]],
+             color='r', linewidth=1.2, zorder=100)
+
+    # 画密度点
+    pos = np.vstack([x, y])
+    kernel = stats.gaussian_kde(pos)
+    z = kernel(pos)
+    norm = plt.Normalize()
+    norm.autoscale(z)
+    plt.scatter(x, y, c=z, norm=norm, s=6, marker="o", cmap=plt.cm.jet, lw=0)
+
+    ax = plt.gca()
+
+    # 设定小刻度
+    xticklocs = ax.xaxis.get_ticklocs()
+    yticklocs = ax.yaxis.get_ticklocs()
+    ax.xaxis.set_minor_locator(MultipleLocator((xticklocs[1] - xticklocs[0]) / 5))
+    ax.yaxis.set_minor_locator(MultipleLocator((yticklocs[1] - yticklocs[0]) / 5))
+
+    add_annotate(ax, tl_list, 'left')  # 注释文字
+    add_annotate(ax, tr_list, 'right')  #  '#9300d3'
+    add_title(titledict)
+    set_tick_font(ax)
+    plt.savefig(filename)
+    fig.clear()
+    plt.close()
 
 
 def add_colorbar_right_vertical(fig, colorMin, colorMax,
