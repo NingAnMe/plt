@@ -332,7 +332,7 @@ def draw_Scatter_Bar(x, y, filename, titledict, tl_list, tr_list, part1, part2, 
 
     # 画散点
     colorValues = 'b'
-    ax1.scatter(x, y, s=5, marker='o', c=colorValues, lw=0, alpha=alpha)
+    ax1.scatter(x, y, s=10, marker='o', c=colorValues, lw=0, alpha=alpha)
 
     # 设定小刻度
     xticklocs = ax1.xaxis.get_ticklocs()
@@ -494,7 +494,7 @@ def draw_density(x, y, filename, titledict, tl_list, tr_list,
     # 回归线
 
     plt.plot([xmin, xmax], [ab[0] * xmin + ab[1], ab[0] * xmax + ab[1]],
-             color='r', linewidth=1.2, zorder=100)
+             color='r', linewidth=1, zorder=100)
 
     # 画密度点
     pos = np.vstack([x, y])
@@ -502,7 +502,7 @@ def draw_density(x, y, filename, titledict, tl_list, tr_list,
     z = kernel(pos)
     norm = plt.Normalize()
     norm.autoscale(z)
-    plt.scatter(x, y, c=z, norm=norm, s=6, marker="o", cmap=plt.cm.jet, lw=0)
+    plt.scatter(x, y, c=z, norm=norm, s=6, marker="o", cmap=plt.cm.jet, lw=0, alpha=1)
 
     ax = plt.gca()
 
