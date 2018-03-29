@@ -442,6 +442,22 @@ def G_reg1d(xx, yy, ww=None):
     return rtn
 
 
+def extraction_point(lyst, counts, times):
+    """
+    对一个一维列表进行数据抽取，直到数据的数量小于某个值
+    :param lyst: 一维列表
+    :param counts: 需要控制的数量
+    :param times: 每次迭代减少的倍数
+    :return:
+    """
+    if len(lyst) > counts:
+        idx = [x for x in xrange(0, len(lyst), times)]
+        lyst = lyst[idx]
+        if len(lyst) > counts:
+            lyst = extraction_point(lyst, counts, times)
+    return lyst
+
+
 # def isDay(sec):
 #     '''
 #     not used
