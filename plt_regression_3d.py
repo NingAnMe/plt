@@ -413,6 +413,8 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             xmin, xmax, ymin, ymax, diagonal)
     if isMonthly:
         o_file = o_file + "_density"
+        x = extraction_point(x, 50000, 3)
+        y = extraction_point(y, 50000, 3)
         dv_pub_legacy.draw_density(
             x, y,
             o_file, DictTitle_rad,
@@ -444,8 +446,8 @@ def G_reg1d(xx, yy, ww=None):
 
 def extraction_point(lyst, counts, times):
     """
-    对一个一维列表进行数据抽取，直到数据的数量小于某个值
-    :param lyst: 一维列表
+    对一个一维 numpy 列表进行数据抽取，直到数据的数量小于某个值
+    :param lyst: 一维 numpy 列表
     :param counts: 需要控制的数量
     :param times: 每次迭代减少的倍数
     :return:
@@ -467,94 +469,94 @@ def extraction_point(lyst, counts, times):
 #     return dt.hour == 0
 
 ######################### 程序全局入口 ##############################
+if __name__ == "__main__":
+    # ###### test start
+    # run('FY3D+MERSI_METOP-A+IASI', '20180101-20180101', False)
+    # ###### test end
 
-# ###### test start
-# run('FY3D+MERSI_METOP-A+IASI', '20180101-20180101', False)
-# ###### test end
-
-# 获取程序参数接口
-args = sys.argv[1:]
-help_info = \
-    u'''
-    [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
-    [参数样例2]：处理所有卫星对
-    '''
-if '-h' in args:
-    print help_info
-    sys.exit(-1)
-
-# 获取程序所在位置，拼接配置文件
-MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-ProjPath = os.path.dirname(MainPath)
-omPath = os.path.dirname(ProjPath)
-dvPath = os.path.join(os.path.dirname(omPath), 'DV')
-cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
-
-# 配置不存在预警
-if not os.path.isfile(cfgFile):
-    print (u'配置文件不存在 %s' % cfgFile)
-    sys.exit(-1)
-
-# 载入配置文件
-inCfg = ConfigObj(cfgFile)
-MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
-DRA_DIR = inCfg['PATH']['OUT']['DRA']
-MRA_DIR = inCfg['PATH']['OUT']['MRA']
-ABR_DIR = inCfg['PATH']['OUT']['ABR']
-LogPath = inCfg['PATH']['OUT']['LOG']
-Log = LogServer(LogPath)
-
-# 开启进程池
-threadNum = inCfg['CROND']['threads']
-pool = Pool(processes=int(threadNum))
-
-if len(args) == 2:
-    Log.info(u'手动日月回归分析程序开始运行-----------------------------')
-    satPair = args[0]
-    str_time = args[1]
-    date_s, date_e = pb_time.arg_str2date(str_time)
-    isMonthly = False
-    if len(str_time) == 13:
-        isMonthly = True
-        timeStep = relativedelta(months=1)
-    elif len(str_time) == 17:
-        timeStep = relativedelta(days=1)
-    else:
-        print 'time format error  yyyymmdd-yyyymmdd or yyyymm-yyyymm'
+    # 获取程序参数接口
+    args = sys.argv[1:]
+    help_info = \
+        u'''
+        [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
+        [参数样例2]：处理所有卫星对
+        '''
+    if '-h' in args:
+        print help_info
         sys.exit(-1)
-    # 定义参数List，传参给线程池
-    args_List = []
 
-    while date_s <= date_e:
-        ymd = date_s.strftime('%Y%m%d')
-        pool.apply_async(run, (satPair, ymd, isMonthly))
-        date_s = date_s + timeStep
+    # 获取程序所在位置，拼接配置文件
+    MainPath, MainFile = os.path.split(os.path.realpath(__file__))
+    ProjPath = os.path.dirname(MainPath)
+    omPath = os.path.dirname(ProjPath)
+    dvPath = os.path.join(os.path.dirname(omPath), 'DV')
+    cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 
-    pool.close()
-    pool.join()
+    # 配置不存在预警
+    if not os.path.isfile(cfgFile):
+        print (u'配置文件不存在 %s' % cfgFile)
+        sys.exit(-1)
 
-elif len(args) == 0:
-    Log.info(u'自动日月回归分析程序开始运行 -----------------------------')
-    rolldays = inCfg['CROND']['rolldays']
-    pairLst = inCfg['PAIRS'].keys()
+    # 载入配置文件
+    inCfg = ConfigObj(cfgFile)
+    MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
+    DRA_DIR = inCfg['PATH']['OUT']['DRA']
+    MRA_DIR = inCfg['PATH']['OUT']['MRA']
+    ABR_DIR = inCfg['PATH']['OUT']['ABR']
+    LogPath = inCfg['PATH']['OUT']['LOG']
+    Log = LogServer(LogPath)
 
-    for satPair in pairLst:
-        ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
-        if ProjMode1 == 0:
-            continue
-        for rdays in rolldays:
-            isMonthly = False
-            ymd = (datetime.utcnow() - relativedelta(days=int(rdays))).strftime('%Y%m%d')
+    # 开启进程池
+    threadNum = inCfg['CROND']['threads']
+    pool = Pool(processes=int(threadNum))
+
+    if len(args) == 2:
+        Log.info(u'手动日月回归分析程序开始运行-----------------------------')
+        satPair = args[0]
+        str_time = args[1]
+        date_s, date_e = pb_time.arg_str2date(str_time)
+        isMonthly = False
+        if len(str_time) == 13:
+            isMonthly = True
+            timeStep = relativedelta(months=1)
+        elif len(str_time) == 17:
+            timeStep = relativedelta(days=1)
+        else:
+            print 'time format error  yyyymmdd-yyyymmdd or yyyymm-yyyymm'
+            sys.exit(-1)
+        # 定义参数List，传参给线程池
+        args_List = []
+
+        while date_s <= date_e:
+            ymd = date_s.strftime('%Y%m%d')
             pool.apply_async(run, (satPair, ymd, isMonthly))
-        # 增加一个月的作业,默认当前月和上一个月
-        isMonthly = True
-        ymd = (datetime.utcnow() - relativedelta(days=int(rolldays[0]))).strftime('%Y%m%d')
-        ymdLast = (datetime.utcnow() - relativedelta(months=1)).strftime('%Y%m%d')
-        pool.apply_async(run, (satPair, ymd, isMonthly))
-        pool.apply_async(run, (satPair, ymdLast, isMonthly))
+            date_s = date_s + timeStep
 
-    pool.close()
-    pool.join()
-else:
-    print 'args: error'
-    sys.exit(-1)
+        pool.close()
+        pool.join()
+
+    elif len(args) == 0:
+        Log.info(u'自动日月回归分析程序开始运行 -----------------------------')
+        rolldays = inCfg['CROND']['rolldays']
+        pairLst = inCfg['PAIRS'].keys()
+
+        for satPair in pairLst:
+            ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
+            if ProjMode1 == 0:
+                continue
+            for rdays in rolldays:
+                isMonthly = False
+                ymd = (datetime.utcnow() - relativedelta(days=int(rdays))).strftime('%Y%m%d')
+                pool.apply_async(run, (satPair, ymd, isMonthly))
+            # 增加一个月的作业,默认当前月和上一个月
+            isMonthly = True
+            ymd = (datetime.utcnow() - relativedelta(days=int(rolldays[0]))).strftime('%Y%m%d')
+            ymdLast = (datetime.utcnow() - relativedelta(months=1)).strftime('%Y%m%d')
+            pool.apply_async(run, (satPair, ymd, isMonthly))
+            pool.apply_async(run, (satPair, ymdLast, isMonthly))
+
+        pool.close()
+        pool.join()
+    else:
+        print 'args: error'
+        sys.exit(-1)
