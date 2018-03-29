@@ -502,7 +502,7 @@ def draw_density(x, y, filename, titledict, tl_list, tr_list,
     z = kernel(pos)
     norm = plt.Normalize()
     norm.autoscale(z)
-    plt.scatter(x, y, c=z, norm=norm, s=10, marker="o", cmap=plt.cm.jet, lw=0, alpha=1)
+    plt.scatter(x, y, c=z, norm=norm, s=5, marker="o", cmap=plt.cm.jet, lw=0, alpha=1)
 
     ax = plt.gca()
 

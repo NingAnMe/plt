@@ -413,8 +413,9 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             xmin, xmax, ymin, ymax, diagonal)
     if isMonthly:
         o_file = o_file + "_density"
-        x = extraction_point(x, 2000, 3)
-        y = extraction_point(y, 2000, 3)
+        x = extraction_point(x, 50000, 3)
+        y = extraction_point(y, 50000, 3)
+        length_rad = len(x)
         dv_pub_legacy.draw_density(
             x, y,
             o_file, DictTitle_rad,
