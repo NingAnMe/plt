@@ -413,9 +413,10 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             xmin, xmax, ymin, ymax, diagonal)
     if isMonthly:
         o_file = o_file + "_density"
-        x = extraction_point(x, 50000, 3)
-        y = extraction_point(y, 50000, 3)
-        length_rad = len(x)
+        times = len(x) // 50000 + 1
+        x = extraction_point(x, 50000, times)
+        y = extraction_point(y, 50000, times)
+
         dv_pub_legacy.draw_density(
             x, y,
             o_file, DictTitle_rad,
@@ -453,6 +454,9 @@ def extraction_point(lyst, counts, times):
     :param times: 每次迭代减少的倍数
     :return:
     """
+    if times == 1:
+        return lyst
+
     if len(lyst) > counts:
         idx = [x for x in xrange(0, len(lyst), times)]
         lyst = lyst[idx]
