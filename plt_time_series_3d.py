@@ -121,6 +121,7 @@ class coeff_abr(object):
 
         return retAry
 
+
 def run(pair, date_s, date_e):
     '''
     pair: sat1+sensor1_sat2+sensor2
@@ -252,7 +253,7 @@ def run(pair, date_s, date_e):
 
                 # plot interpolated TBBias img (obs minus backgroud) -------------
                 title = 'Brightness Temperature Correction\n%s  %s  %s' % \
-                         (pair, chan, DayOrNight)
+                        (pair, chan, DayOrNight)
 
                 if isLaunch:
                     picPath = os.path.join(OMB_DIR, pair,
@@ -262,6 +263,7 @@ def run(pair, date_s, date_e):
                               '%s_TBBOMB_%s_%s_Year_%s.png' % (pair, chan, DayOrNight, ymd_e))
                 plot_omb(date_D[idx_D], a_D[idx_D], b_D[idx_D],
                          picPath, title, date_s, date_e)
+
 
 def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, satName):
     """
@@ -286,6 +288,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, 
 
     xlim_min = pb_time.ymd2date('%04d%02d01' % (date_s.year, date_s.month))
     xlim_max = date_e
+    plt.plot([xlim_min, xlim_max], [0, 0], 'k')  # 在 y = 0 绘制一条黑色直线
     plt.xlim(xlim_min, xlim_max)
     if "FY2" in satName:
         plt.ylim(-8, 8)
@@ -328,6 +331,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, 
     fig.clear()
     plt.close()
 
+
 def setXLocator(ax, xlim_min, xlim_max):
     day_range = (xlim_max - xlim_min).days
 #     if day_range <= 2:
@@ -360,6 +364,7 @@ def setXLocator(ax, xlim_min, xlim_max):
         if month_range <= 48:
             add_year_xaxis(ax, xlim_min, xlim_max)
 
+
 def add_year_xaxis(ax, xlim_min, xlim_max):
     '''
     add year xaxis
@@ -382,6 +387,7 @@ def add_year_xaxis(ax, xlim_min, xlim_max):
     newax.tick_params(which='both', direction='in')
     set_tick_font(newax)
     newax.xaxis.set_tick_params(length=5)
+
 
 def plot_abc(date_D, a_D, b_D, c_D,
              date_M, a_M, b_M, c_M,
@@ -506,6 +512,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
     fig.savefig(picPath)
     plt.close()
     fig.clear
+
 
 def plot_omb(date_D, a_D, b_D,
              picPath, title,
