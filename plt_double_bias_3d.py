@@ -167,6 +167,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     xlim_max = date_e
     plt.xlim(xlim_min, xlim_max)
     plt.ylim(-1, 1)
+    plt.plot([xlim_min, xlim_max], [0, 0], 'k')  # 在 y = 0 绘制一条黑色直线
 
     ax = plt.gca()
     # format the ticks

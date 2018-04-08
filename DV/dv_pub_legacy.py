@@ -374,7 +374,7 @@ def draw_Scatter_Bar(x, y, filename, titledict, tl_list, tr_list, part1, part2, 
         ax3.yaxis.set_minor_locator(MultipleLocator(0.008))
     delta = x - y
     # 添加y=0的线
-    COLOR_Darkgray = '#888888'
+    COLOR_Darkgray = '#000000'
     ax3.plot([xmin, xmax], [0, 0],
              color=COLOR_Darkgray, linewidth=0.6)
     # 散点
