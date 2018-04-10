@@ -371,9 +371,9 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         'title': '{} Regression {} Days {}_{} {} {}'.format(
             titleName, num_file, part1, part2, chan, ymd)}
 
+    # 过滤 正负 delta+8倍std 的杂点 ------------
     w = 1.0 / weight if weight is not None else None
     RadCompare = G_reg1d(x, y, w)
-    # 过滤 正负 delta+4倍std 的杂点 ------------------------
     reg_line = x * RadCompare[0] + RadCompare[1]
     delta = np.abs(y - reg_line)
     mean_delta = np.mean(delta)

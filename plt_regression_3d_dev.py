@@ -73,6 +73,8 @@ def run(pair, ymd, isMonthly):
                     Day_Night.remove(t)
 
         for idx, chan in enumerate(plt_cfg[each]['chan']):
+            if chan != 'CH_24':
+                continue
             Log.info(u"Start Drawing {} Channel {}".format(each, chan))
             oneHDF5 = ReadHDF5()
             num_file = PERIOD
@@ -105,7 +107,9 @@ def run(pair, ymd, isMonthly):
                 oneHDF5.rad1_std = oneHDF5.rad1_std[deletezeros]
                 oneHDF5.rad1 = oneHDF5.rad1[deletezeros] if len(oneHDF5.rad1) > 0 else oneHDF5.rad1
                 oneHDF5.rad2 = oneHDF5.rad2[deletezeros] if len(oneHDF5.rad2) > 0 else oneHDF5.rad2
+                print('chan1', chan, len(oneHDF5.tbb1))
                 oneHDF5.tbb1 = oneHDF5.tbb1[deletezeros] if len(oneHDF5.tbb1) > 0 else oneHDF5.tbb1
+                print('chan1', chan, len(oneHDF5.tbb1))
                 oneHDF5.tbb2 = oneHDF5.tbb2[deletezeros] if len(oneHDF5.tbb2) > 0 else oneHDF5.tbb2
                 oneHDF5.time = oneHDF5.time[deletezeros] if len(oneHDF5.time) > 0 else oneHDF5.time
             if len(oneHDF5.ref1_std) > 0.0001:
@@ -223,12 +227,13 @@ def run(pair, ymd, isMonthly):
                     o_file = os.path.join(cur_path,
                                           '%s_%s_%s_Day_%s' % (pair, o_name, chan, str_time))
                     print('6')
-                    print('x, y, day_index', len(x), len(y), len(day_index))
+                    print('x, y, day_all', len(x), len(y), len(day_index))
                     x_d = x[day_index]
                     y_d = y[day_index]
                     print('8')
                     w_d = weight[day_index] if weight is not None else None
                     print('9')
+                    print('x, y, day_index', len(x_d), len(y_d), len(day_index))
                     abr = plot(x_d, y_d, w_d, o_file,
                                num_file, part1, part2, chan, str_time,
                                xname, xname_l, xunit, xmin, xmax,
@@ -376,7 +381,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
     w = 1.0 / weight if weight is not None else None
     RadCompare = G_reg1d(x, y, w)
-    # 过滤 正负 delta+4倍std 的杂点 ------------------------
+    # 过滤 正负 delta+8倍std 的杂点 ------------------------
     reg_line = x * RadCompare[0] + RadCompare[1]
     delta = np.abs(y - reg_line)
     mean_delta = np.mean(delta)

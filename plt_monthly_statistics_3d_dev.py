@@ -50,7 +50,7 @@ def run(pair, ymd):
     Log.info(u"----- Start Drawing Monthly TBBias Analysis Pic, PAIR: {}, YMD: {}" \
              u" -----".format(pair, ymd))
     for each in plt_cfg['monthly_staistics']:
-        print('each:', plt_cfg['monthly_staistics'])
+        print("1", each)
         # Day_Night must be in 'all', 'day', 'night'
         Day_Night = ['all', 'day', 'night']  # default
         if 'time' in plt_cfg[each].keys():
@@ -84,7 +84,7 @@ def run(pair, ymd):
             # 输出目录
             cur_path = os.path.join(MBA_DIR, pair, ymd[:6])
 
-
+            print('4')
             # find out day and night
             if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
                 jd = oneHDF5.time / 24. / 3600.  # jday from 1993/01/01 00:00:00
@@ -128,6 +128,20 @@ def run(pair, ymd):
             if x.size < 10:
                 Log.error("Not enough match point to draw.")
                 continue
+            print('5')
+            # 获取 std
+            weight = None
+            if 'rad' in xname and 'rad' in yname:
+                if len(oneHDF5.rad1_std) > 0:
+                    weight = oneHDF5.rad1_std
+            elif 'tbb' in xname and 'tbb' in yname:
+                weight = None
+            elif 'ref' in xname and 'ref' in yname:
+                if len(oneHDF5.ref1_std) > 0:
+                    weight = oneHDF5.ref1_std
+            elif 'dn' in xname and 'ref' in yname:
+                weight = None
+            print('1')
             # rad-specified regression starts
             reference_list = []
             if 'reference' in plt_cfg[each]:
@@ -135,7 +149,7 @@ def run(pair, ymd):
             if 'all' in Day_Night:
                 o_file = os.path.join(cur_path,
                                       '%s_%s_%s_ALL_%s' % (pair, o_name, chan, ym))
-                plot(x, y, o_file,
+                plot(x, y, weight, o_file,
                      part1, part2, chan, ym, 'ALL', reference_list,
                      xname, xname_l, xunit, xmin, xmax)
 
@@ -147,10 +161,12 @@ def run(pair, ymd):
                                           '%s_%s_%s_Day_%s' % (pair, o_name, chan, ym))
                     x_d = x[day_index]
                     y_d = y[day_index]
-
-                    plot(x_d, y_d, o_file,
+                    w_d = weight[day_index] if weight is not None else None
+                    print('3')
+                    plot(x_d, y_d, w_d, o_file,
                          part1, part2, chan, ym, 'Day', reference_list,
                          xname, xname_l, xunit, xmin, xmax)
+            print('2')
             if 'night' in Day_Night:
                 # ---------night ------------
                 if night_index is not None and np.where(night_index)[0].size > 10 :
@@ -159,22 +175,47 @@ def run(pair, ymd):
                                           '%s_%s_%s_Night_%s' % (pair, o_name, chan, ym))
                     x_n = x[night_index]
                     y_n = y[night_index]
-                    plot(x_n, y_n, o_file,
+                    w_n = weight[day_index] if weight is not None else None
+                    plot(x_n, y_n, w_n, o_file,
                          part1, part2, chan, ym, 'Night', reference_list,
                          xname, xname_l, xunit, xmin, xmax)
+    print('success %s', ymd)
 
 
-def plot(x, y, picPath,
+def plot(x, y, weight, picPath,
          part1, part2, chan, ym, DayOrNight, reference_list,
          xname, xname_l, xunit, xmin, xmax):
-    '''
+    """
     x: 参考卫星传感器数据
     y: FY数据
-    '''
+    """
     if xname_l == "TBB": xname_l = "TB"
     xlim_min = xmin
     xlim_max = xmax
-    # 修改为国内减国外： x - y
+    print('filter 1', len(x), chan, ym, DayOrNight, picPath)
+    # 过滤 正负 delta+8倍std 的杂点 ------------------------
+    print type(weight)
+    print type(x), len(x)
+    print type(y), len(y)
+    w = 1.0 / weight if weight is not None else None
+    print(type(w))
+    RadCompare = G_reg1d(x, y, w)
+    print('111')
+    reg_line = x * RadCompare[0] + RadCompare[1]
+    delta = np.abs(y - reg_line)
+    mean_delta = np.mean(delta)
+    std_delta = np.std(delta)
+    print('222')
+    max_y = reg_line + mean_delta + std_delta * 8
+    min_y = reg_line - mean_delta - std_delta * 8
+    print('333')
+    idx = np.logical_and(y < max_y, y > min_y)
+    x = x[idx]
+    y = y[idx]
+    w = w[idx] if weight is not None else None
+    # -----------------------------------------
+    print('filter 2', len(x))
+    # 修改偏差值为国内减国外： x - y
     delta = x - y
 
     if xname == "tbb":
@@ -322,7 +363,6 @@ def get_bar_data(xx, delta, Tmin, Tmax, step):
             sampleNums.append(0)
         T_seg.append(i + step / 2.)
 
-    # print T_seg,mean_seg
     return np.array(T_seg), np.array(mean_seg), np.array(std_seg), np.array(sampleNums)
 
 
