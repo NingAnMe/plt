@@ -162,7 +162,7 @@ def run(pair, ymd):
                     x_d = x[day_index]
                     y_d = y[day_index]
                     w_d = weight[day_index] if weight is not None else None
-                    plot(x_d, y_d, weight, o_file,
+                    plot(x_d, y_d, w_d, o_file,
                          part1, part2, chan, ym, 'Day', reference_list,
                          xname, xname_l, xunit, xmin, xmax)
             if 'night' in Day_Night:
@@ -174,7 +174,7 @@ def run(pair, ymd):
                     x_n = x[night_index]
                     y_n = y[night_index]
                     w_n = weight[day_index] if weight is not None else None
-                    plot(x_n, y_n, weight, o_file,
+                    plot(x_n, y_n, w_n, o_file,
                          part1, part2, chan, ym, 'Night', reference_list,
                          xname, xname_l, xunit, xmin, xmax)
 

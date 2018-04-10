@@ -50,7 +50,7 @@ def run(pair, ymd):
     Log.info(u"----- Start Drawing Monthly TBBias Analysis Pic, PAIR: {}, YMD: {}" \
              u" -----".format(pair, ymd))
     for each in plt_cfg['monthly_staistics']:
-        print("1", each)
+
         # Day_Night must be in 'all', 'day', 'night'
         Day_Night = ['all', 'day', 'night']  # default
         if 'time' in plt_cfg[each].keys():
@@ -84,7 +84,7 @@ def run(pair, ymd):
             # 输出目录
             cur_path = os.path.join(MBA_DIR, pair, ymd[:6])
 
-            print('4')
+
             # find out day and night
             if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
                 jd = oneHDF5.time / 24. / 3600.  # jday from 1993/01/01 00:00:00
@@ -128,7 +128,7 @@ def run(pair, ymd):
             if x.size < 10:
                 Log.error("Not enough match point to draw.")
                 continue
-            print('5')
+
             # 获取 std
             weight = None
             if 'rad' in xname and 'rad' in yname:
@@ -141,7 +141,7 @@ def run(pair, ymd):
                     weight = oneHDF5.ref1_std
             elif 'dn' in xname and 'ref' in yname:
                 weight = None
-            print('1')
+
             # rad-specified regression starts
             reference_list = []
             if 'reference' in plt_cfg[each]:
@@ -162,11 +162,9 @@ def run(pair, ymd):
                     x_d = x[day_index]
                     y_d = y[day_index]
                     w_d = weight[day_index] if weight is not None else None
-                    print('3')
                     plot(x_d, y_d, w_d, o_file,
                          part1, part2, chan, ym, 'Day', reference_list,
                          xname, xname_l, xunit, xmin, xmax)
-            print('2')
             if 'night' in Day_Night:
                 # ---------night ------------
                 if night_index is not None and np.where(night_index)[0].size > 10 :
@@ -179,7 +177,6 @@ def run(pair, ymd):
                     plot(x_n, y_n, w_n, o_file,
                          part1, part2, chan, ym, 'Night', reference_list,
                          xname, xname_l, xunit, xmin, xmax)
-    print('success %s', ymd)
 
 
 def plot(x, y, weight, picPath,
@@ -192,29 +189,23 @@ def plot(x, y, weight, picPath,
     if xname_l == "TBB": xname_l = "TB"
     xlim_min = xmin
     xlim_max = xmax
-    print('filter 1', len(x), chan, ym, DayOrNight, picPath)
-    # 过滤 正负 delta+8倍std 的杂点 ------------------------
-    print type(weight)
-    print type(x), len(x)
-    print type(y), len(y)
+
+    # 过滤 正负 delta+8倍std 的杂点 ------------
     w = 1.0 / weight if weight is not None else None
-    print(type(w))
     RadCompare = G_reg1d(x, y, w)
-    print('111')
     reg_line = x * RadCompare[0] + RadCompare[1]
     delta = np.abs(y - reg_line)
     mean_delta = np.mean(delta)
     std_delta = np.std(delta)
-    print('222')
     max_y = reg_line + mean_delta + std_delta * 8
     min_y = reg_line - mean_delta - std_delta * 8
-    print('333')
+
     idx = np.logical_and(y < max_y, y > min_y)
     x = x[idx]
     y = y[idx]
     w = w[idx] if weight is not None else None
     # -----------------------------------------
-    print('filter 2', len(x))
+
     # 修改偏差值为国内减国外： x - y
     delta = x - y
 
