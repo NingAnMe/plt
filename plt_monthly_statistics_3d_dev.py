@@ -1,31 +1,37 @@
 # coding: utf-8
-'''
+"""
 Created on 2016年1月6日
 读取匹配后的HDF5文件，画散点回归图，生成abr文件
 
 @author: duxiang, zhangtao, anning
-'''
+"""
+import calendar
+import os
+import sys
+from datetime import datetime
+from multiprocessing import Pool
+
 import numpy as np
-from multiprocessing import Pool , Lock
-import os, sys, calendar
+from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
+from PB.CSC.pb_csc_console import LogServer
 from configobj import ConfigObj
 from dateutil.relativedelta import relativedelta
 from matplotlib.ticker import MultipleLocator
 from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
-from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
-from DV.dv_pub_legacy import plt, add_annotate, set_tick_font, FONT0, FONT_MONO
+
+from DV.dv_pub_3d import plt, add_annotate, set_tick_font, FONT0, FONT_MONO,\
+    draw_distribution
 from PB import pb_time, pb_io
-from PB.CSC.pb_csc_console import LogServer
-from datetime import datetime
 from plt_io import ReadHDF5, loadYamlCfg
 
+
 def run(pair, ymd):
-    '''
+    """
     pair: sat1+sensor1_sat2+sensor2
     ymd: str YYYYMMDD
-    '''
+    """
     part1, part2 = pair.split('_')
     sat1, sensor1 = part1.split('+')
     sat2, sensor2 = part2.split('+')
@@ -186,9 +192,10 @@ def plot(x, y, weight, picPath,
     x: 参考卫星传感器数据
     y: FY数据
     """
-    if xname_l == "TBB": xname_l = "TB"
-    xlim_min = xmin
-    xlim_max = xmax
+    plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
+    if xname_l == "TBB":
+        xname_l = "TB"
+
 
     # 过滤 正负 delta+8倍std 的杂点 ------------
     w = 1.0 / weight if weight is not None else None
@@ -213,55 +220,102 @@ def plot(x, y, weight, picPath,
         step = 5
     else:
         step = 0.1
-    T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xlim_min, xlim_max, step)
 
     RadCompare = G_reg1d(x, y)
     a, b = RadCompare[0], RadCompare[1]
 
+    # 开始绘图
     fig = plt.figure(figsize=(6, 5))
-    ax1 = plt.subplot(211)
-    ax2 = plt.subplot(212, sharex=ax1)
-
-    # format the Xticks
-    ax1.set_xlim(xlim_min, xlim_max)
-
-    # format the Yticks
-    if xname == "tbb":
-        ax1.set_ylim(-4, 4)
-        ax1.yaxis.set_major_locator(MultipleLocator(2))
-        ax1.yaxis.set_minor_locator(MultipleLocator(1))
-    elif xname == "ref":
-        ax1.set_ylim(-0.08, 0.08)
-        ax1.yaxis.set_major_locator(MultipleLocator(0.02))
-        ax1.yaxis.set_minor_locator(MultipleLocator(0.01))
-    ax2.set_ylim(0, 7)
-    ax2.yaxis.set_major_locator(MultipleLocator(1))
-    ax2.yaxis.set_minor_locator(MultipleLocator(0.2))
-
+    ax1 = plt.subplot2grid((1, 2), (0, 0))
+    ax2 = plt.subplot2grid((1, 2), (0, 1))
+    # 图片 Title
     title = '%s Bias Monthly Statistics\n%s Minus %s  %s  %s' % \
             (xname_l, part1, part2, chan, DayOrNight)
-    # plot ax1 -------------------------------------------------
-    plt.sca(ax1)
-    strlist = [[]]
-    for ref_temp in reference_list:
-        plt.axvline(x=ref_temp, color='#4cd964', lw=0.7)
-        ax1.annotate(str(ref_temp) + xunit, (ref_temp, -3.5),
-                     va="top", ha="center", color=EDGE_GRAY,
-                     size=6, fontproperties=FONT_MONO)
-        strlist[0].append("%s Bias %s: %6.3f" %
-                          (xname_l, str(ref_temp) + xunit, ref_temp * a + b - ref_temp))
-    strlist[0].append('Total Number: %7d' % len(x))
+
+    # plot 偏差分布图 -------------------------------------------------
+    # x y 轴范围
+    xmin_distri = xmin
+    xmax_distri = xmax
+    if xname == "tbb":
+        ymin_distri = -4
+        ymax_distri = 4
+    elif xname == "ref":
+        ymin_distri = -0.08
+        ymax_distri = 0.08
+    else:
+        ymin_distri = None
+        ymax_distri = None
+
+    # Distri label
+    label = {}
+    ylabel = 'D%s' % (xname_l) + ('($%s$)' % xunit if xunit != "" else "")
+    label["ylabel"] = ylabel
+
+    ref_temp = reference_list[0]  # 获取拟合系数
+
+    if xname == "tbb":
+        avxline = {
+            'line_x': ref_temp, 'line_color': '#4cd964', 'line_width': 0.7,
+            'word': str(ref_temp) + xunit, 'word_color': EDGE_GRAY,
+            'word_size': 6, 'word_location': (ref_temp, -3.5)
+        }
+        annotate3 = "TBB Bias ({} K) : {:.4f} K".format(
+            ref_temp, ref_temp * a + b - ref_temp)
+        ax_annotate = {"left": [annotate3], "right": []}
+    elif xname == "ref":
+        avxline = {
+            'line_x': ref_temp, 'line_color': '#4cd964', 'line_width': 0.7,
+            'word': str(ref_temp) + xunit, 'word_color': EDGE_GRAY,
+            'word_size': 6, 'word_location': (ref_temp, -0.07)
+        }
+        annotate3 = "Relative Bias (REF {}) : {:.4f} %".format(
+            ref_temp, (ref_temp * a + b) / ref_temp * 100)
+        ax_annotate = {"left": [annotate3], "right": []}
+    else:
+        avxline = None
+        ax_annotate = None
+
+    draw_distribution(ax1, x, y, label=label, ax_annotate=ax_annotate,
+                      xmin=xmin_distri, xmax=xmax_distri,
+                      ymin=ymin_distri, ymax=ymax_distri,
+                      avxline=avxline)
+
+    # strlist_ax1 = [[]]
+    # strlist_ax2 = [[]]
+    #
+    # for ref_temp in reference_list:
+    #     ax1.axvline(x=ref_temp, color='#4cd964', lw=0.7)
+    #     if xname == "tbb":
+    #         ax1.annotate(str(ref_temp) + xunit, (ref_temp, -3.5),
+    #                      va="top", ha="center", color=EDGE_GRAY,
+    #                      size=6, fontproperties=FONT_MONO)
+    #     elif xname == "ref":
+    #         ax1.annotate(str(ref_temp) + xunit, (ref_temp, -0.07),
+    #                      va="top", ha="center", color=EDGE_GRAY,
+    #                      size=6, fontproperties=FONT_MONO)
+    #     strlist_ax1[0].append("%s Bias %s: %6.3f" %
+    #                           (xname_l, str(ref_temp) + xunit, ref_temp * a + b - ref_temp))
+    strlist_ax2[0].append('Total Number: %7d' % len(x))
+
+    T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xlim_min,
+                                                        xlim_max, step)
     plt.plot(x, delta, 'o', ms=1.5,
              markerfacecolor=BLUE, alpha=0.5,
              mew=0, zorder=10)
     plt.plot(T_seg, mean_seg, 'o-',
              ms=6, lw=0.6, c=RED,
              mew=0, zorder=50)
+    # 添加y=0的线
+    COLOR_Darkgray = '#808080'
+    plt.plot([xmin, xmax], [0, 0],
+             color=COLOR_Darkgray, linewidth=1.0)
+
     plt.fill_between(T_seg, mean_seg - std_seg, mean_seg + std_seg,
                      facecolor=RED, edgecolor=RED,
                      interpolate=True, alpha=0.4, zorder=100)
 
-    ylabel = 'D%s' % (xname_l) + ('($%s$)' % xunit if xunit != "" else "")
+    add_annotate(ax1, strlist_ax1, 'left', EDGE_GRAY, 9)
+
     plt.ylabel(ylabel, fontsize=11, fontproperties=FONT0)
     plt.grid(True)
     plt.title(title, fontsize=12, fontproperties=FONT0)
@@ -269,6 +323,11 @@ def plot(x, y, weight, picPath,
     plt.setp(ax1.get_xticklabels(), visible=False)
 
     # point number -------------------------------------------------
+    # y 轴范围
+
+    ax2.set_ylim(0, 7)
+    ax2.yaxis.set_major_locator(MultipleLocator(1))
+    ax2.yaxis.set_minor_locator(MultipleLocator(0.2))
     plt.sca(ax2)
     if xname == "tbb":
         width = 3
@@ -281,7 +340,7 @@ def plot(x, y, weight, picPath,
             plt.text(T, np.log10(sampleNums[i]) + 0.2, '%d' % int(sampleNums[i]), ha="center",
                      fontsize=6, fontproperties=FONT_MONO)
 
-    add_annotate(ax2, strlist, 'left', EDGE_GRAY, 9)
+    add_annotate(ax2, strlist_ax2, 'left', EDGE_GRAY, 9)
     plt.ylabel('Number of sample points\nlog (base = 10)', fontsize=11, fontproperties=FONT0)
     xlabel = '%s %s' % (part2, xname_l) + ('($%s$)' % xunit if xunit != "" else "")
     plt.xlabel(xlabel, fontsize=11, fontproperties=FONT0)
@@ -373,6 +432,8 @@ if '-h' in args:
 # 获取程序所在位置，拼接配置文件
 MainPath, MainFile = os.path.split(os.path.realpath(__file__))
 ProjPath = os.path.dirname(MainPath)
+omPath = os.path.dirname(ProjPath)
+dvPath = os.path.join(os.path.dirname(omPath), 'DV')
 cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 omdFile = os.path.join(ProjPath, 'cfg', 'dm_odm.cfg')
 

@@ -194,15 +194,33 @@ def add_xylabel(ax, xlabel, ylabel):
     :param ylabel: 字符串
     :return:
     """
-    ax.set_xlabel(xlabel, fontsize=11, fontproperties=FONT0)
-    ax.set_ylabel(ylabel, fontsize=11, fontproperties=FONT0)
+    if xlabel is not None:
+        ax.set_xlabel(xlabel, fontsize=11, fontproperties=FONT0)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel, fontsize=11, fontproperties=FONT0)
 
 
-def add_annotate(ax, strlist, loc, color='#303030', fontsize=11):
+def add_label(ax, label, local, fontsize=11, fontproperties=FONT0):
+    """
+    添加子图的标签
+    :param ax:
+    :param label:
+    :param local:
+    :return:
+    """
+    if label is None:
+        return
+    if local == "xlabel":
+        ax.set_xlabel(label, fontsize=fontsize, fontproperties=fontproperties)
+    elif local == "ylabel":
+        ax.set_ylabel(label, fontsize=fontsize, fontproperties=fontproperties)
+
+
+def add_annotate(ax, strlist, local, color='#303030', fontsize=11):
     """
     添加上方注释文字
     loc must be 'left' or 'right'
-    格式[['annotate1', 'annotate2']]
+    格式 ['annotate1', 'annotate2']
     """
     if strlist is None:
         return
@@ -215,14 +233,14 @@ def add_annotate(ax, strlist, loc, color='#303030', fontsize=11):
 
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    if loc == 'left':
+    if local == 'left':
         ax.text(xlim[0] + x_toedge, ylim[1] - y_toedge,
-                '\n'.join(strlist), ha=loc, va='top', color=color,
+                '\n'.join(strlist), ha=local, va='top', color=color,
                 fontsize=fontsize, fontproperties=FONT_MONO)
         x_toedge = x_toedge + x_step * 1.4
-    elif loc == 'right':
+    elif local == 'right':
         ax.text(xlim[1] - x_toedge, ylim[1] - y_toedge,
-                '\n'.join(strlist), ha=loc, va='top', color=color,
+                '\n'.join(strlist), ha=local, va='top', color=color,
                 fontsize=fontsize, fontproperties=FONT_MONO)
         x_toedge = x_toedge + x_step * 1.4
 
@@ -467,9 +485,9 @@ def bias_information(x, y, percent=0.1):
     return bias_info
 
 
-def draw_distribution(ax, x, y, x_label=None, y_label=None, ax_annotate={},
+def draw_distribution(ax, x, y, label=None, ax_annotate=None,
                       xmin=None, xmax=None, ymin=None, ymax=None, gab_number=8.0,
-                      is_diagonal=False):
+                      is_diagonal=False, avxline=None):
     """
     画偏差分布图
     :return:
@@ -485,35 +503,63 @@ def draw_distribution(ax, x, y, x_label=None, y_label=None, ax_annotate={},
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
 
-    # format the Yticks
+    # 设置 x y 轴的刻度
+    ax.xaxis.set_major_locator(MultipleLocator((xmax - xmin) / gab_number))
+    ax.xaxis.set_minor_locator(MultipleLocator((xmax - xmin) / gab_number / 2))
     ax.yaxis.set_major_locator(MultipleLocator((ymax - ymin) / gab_number))
     ax.yaxis.set_minor_locator(MultipleLocator((ymax - ymin) / gab_number / 2))
 
     # 添加 y = 0 的线
-    line_color = '#808080'
-    ax.plot([xmin, xmax], [0, 0], color=line_color, linewidth=1.0)
-
-    # 计算偏差
-    delta = x - y
+    zeroline_width = 1.0
+    zeroline_color = '#808080'
+    ax.plot([xmin, xmax], [0, 0], color=zeroline_color, linewidth=zeroline_width)
 
     # 画偏差散点
-    alpha_value = 0.8  # 透明度
-    marker_value = 'o'  # 形状
-    color_value = 'b'  # 颜色
-    ax.scatter(x, delta, s=5, marker=marker_value, c=color_value, lw=0, alpha=alpha_value)
+    delta = x - y  # 计算偏差
+    scatter_alpha = 0.8  # 透明度
+    scatter_marker = 'o'  # 形状
+    scatter_color = 'b'  # 颜色
+    ax.scatter(x, delta, s=5, marker=scatter_marker, c=scatter_color, lw=0, alpha=scatter_alpha)
 
-    # 画偏差回归
+    # 画偏差回归线
     delt_ab = np.polyfit(x, delta, 1)
     delt_a = delt_ab[0]
     delt_b = delt_ab[1]
-    ax.plot([xmin, xmax],
-            [xmin * delt_a + delt_b, xmax * delt_a + delt_b],
-            color='r', linewidth=1.2, zorder=100)
+    regressline_x = [xmin, xmax]
+    regressline_y = [xmin * delt_a + delt_b, xmax * delt_a + delt_b]
 
-    # 注释，格式['annotate1', 'annotate2']
-    add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
-    add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
-    add_xylabel(ax, x_label, y_label)
+    regressline_color = 'r'
+    regressline_width = 1.2
+
+    ax.plot(regressline_x, regressline_y,
+            color=regressline_color, linewidth=regressline_width, zorder=100)
+
+    # 画 avx 注释线
+    if avxline is not None:
+        avxline_x = avxline.get("line_x")
+        avxline_color = avxline.get("x_color")
+        avxline_width = 0.7
+        avxline_word = avxline.get("word")
+        avxline_wordcolor = avxline.get("word_color")
+        avxline_wordlocal = avxline.get("word_location")
+        avxline_wordsize = avxline.get("word_size")
+        ax.axvline(x=avxline_x, color=avxline_color, lw=avxline_width)
+        ax.annotate(avxline_word, avxline_wordlocal,
+                    va="top", ha="center", color=avxline_wordcolor,
+                    size=avxline_wordsize, fontproperties=FONT_MONO)
+
+    # 注释，格式 ['annotate1', 'annotate2']
+    if ax_annotate is not None:
+        font_size = 10
+        add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
+        add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
+
+    # 标签
+    if label is not None:
+        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+
+    # 设置 tick 字体
     set_tick_font(ax)
 
 
