@@ -218,7 +218,7 @@ def plot(x, y, weight, picPath,
     else:
         step = 0.1
 
-    RadCompare = G_reg1d(x, y)
+    RadCompare = G_reg1d(x, y, w)
     a, b = RadCompare[0], RadCompare[1]
 
     # 开始绘图
@@ -257,7 +257,7 @@ def plot(x, y, weight, picPath,
     bias_info = bias_information(x, y, 0.1)
 
     # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
-    ab = polyfit(x, y, 1)
+    ab = RadCompare
     a = ab[0]
     b = ab[1]
     if xname == 'tbb':
