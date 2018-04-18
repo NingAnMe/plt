@@ -119,37 +119,6 @@ def get_bar_data(x, y):
     return xList, meanList, stdList
 
 
-def draw_histogram(filename, dvalues, titledict, tl_list, tr_list):
-    '''
-    画直方图
-    '''
-    fig = plt.figure(figsize=(6, 4))
-    fig.subplots_adjust(top=0.92, bottom=0.13, left=0.11, right=0.96)
-
-    hist, bins = np.histogram(dvalues, bins=80)
-    hist = hist / (dvalues.size * 1.0)
-    center = (bins[:-1] + bins[1:]) / 2
-    width = (bins[1] - bins[0])
-    plt.bar(center, hist, align='center', width=width, color='gold', alpha=0.5)
-
-    # params = exponpow.fit(dvalues, floc=0)
-    #     x = np.linspace(center.min(), center.max(), 100)
-    #     pdf = exponpow.pdf(x, *params)
-    #     lred = plt.plot(x, pdf, 'r--', linewidth=1)
-
-    plt.grid(True)
-    ax = plt.gca()
-    add_annotate(ax, tl_list, 'left')
-    add_annotate(ax, tr_list, 'right')
-    add_title(titledict)
-    set_tick_font(ax)
-    print filename
-    plt.savefig(filename)
-    fig.clear()
-    plt.close()
-    return
-
-
 def set_tick_font(ax, scale_size=SCALE_SIZE):
     """
     设定刻度的字体
@@ -314,6 +283,37 @@ def day_data_write(title, data, outFile):
         fp.write(title)
         fp.writelines(data)
         fp.close()
+
+
+def get_bar_data(xx, delta, Tmin, Tmax, step):
+    T_seg = []
+    mean_seg = []
+    std_seg = []
+    sampleNums = []
+    for i in np.arange(Tmin, Tmax, step):
+        idx = np.where(np.logical_and(xx >= i , xx < (i + step)))[0]
+
+        if idx.size > 0:
+            DTb_block = delta[idx]
+        else:
+            continue
+
+        mean1 = mean(DTb_block)
+        std1 = std(DTb_block)
+
+        idx1 = np.where((abs(DTb_block - mean1) < std1))[0]  # 去掉偏差大于std的点
+        if idx1.size > 0:
+            DTb_block = DTb_block[idx1]
+            mean_seg.append(mean(DTb_block))
+            std_seg.append(std(DTb_block))
+            sampleNums.append(len(DTb_block))
+        else:
+            mean_seg.append(0)
+            std_seg.append(0)
+            sampleNums.append(0)
+        T_seg.append(i + step / 2.)
+
+    return np.array(T_seg), np.array(mean_seg), np.array(std_seg), np.array(sampleNums)
 
 
 def draw_Scatter(x, y, filename, titledict, tl_list, tr_list,
@@ -487,7 +487,8 @@ def bias_information(x, y, percent=0.1):
 
 def draw_distribution(ax, x, y, label=None, ax_annotate=None,
                       xmin=None, xmax=None, ymin=None, ymax=None, gab_number=8.0,
-                      is_diagonal=False, avxline=None):
+                      avxline=None, zeroline=None, scatter_delta=None,
+                      scatter_fill=None, regressline=None,):
     """
     画偏差分布图
     :return:
@@ -510,34 +511,53 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
     ax.yaxis.set_minor_locator(MultipleLocator((ymax - ymin) / gab_number / 2))
 
     # 添加 y = 0 的线
-    zeroline_width = 1.0
-    zeroline_color = '#808080'
-    ax.plot([xmin, xmax], [0, 0], color=zeroline_color, linewidth=zeroline_width)
+    if zeroline is not None:
+        zeroline_width = zeroline.get("line_width")
+        zeroline_color = zeroline.get("line_color")
+        ax.plot([xmin, xmax], [0, 0], color=zeroline_color, linewidth=zeroline_width)
 
     # 画偏差散点
-    delta = x - y  # 计算偏差
-    scatter_alpha = 0.8  # 透明度
-    scatter_marker = 'o'  # 形状
-    scatter_color = 'b'  # 颜色
-    ax.scatter(x, delta, s=5, marker=scatter_marker, c=scatter_color, lw=0, alpha=scatter_alpha)
+    if scatter_delta is not None:
+        delta = x - y  # 计算偏差
+        scatter_size = scatter_delta.get("scatter_size")  # 大小
+        scatter_alpha = 0.8  # 透明度
+        scatter_marker = 'o'  # 形状
+        scatter_color = 'b'  # 颜色
+        ax.scatter(x, delta, s=scatter_size, marker=scatter_marker, c=scatter_color, lw=0, alpha=scatter_alpha)
 
     # 画偏差回归线
-    delt_ab = np.polyfit(x, delta, 1)
-    delt_a = delt_ab[0]
-    delt_b = delt_ab[1]
-    regressline_x = [xmin, xmax]
-    regressline_y = [xmin * delt_a + delt_b, xmax * delt_a + delt_b]
+    if regressline is not None:
+        delta = x - y
+        delta_ab = np.polyfit(x, delta, 1)
+        delta_a = delta_ab[0]
+        delta_b = delta_ab[1]
+        regressline_x = [xmin, xmax]
+        regressline_y = [xmin * delta_a + delta_b, xmax * delta_a + delta_b]
 
-    regressline_color = 'r'
-    regressline_width = 1.2
+        regressline_color = 'r'
+        regressline_width = 1.2
 
-    ax.plot(regressline_x, regressline_y,
-            color=regressline_color, linewidth=regressline_width, zorder=100)
+        ax.plot(regressline_x, regressline_y,
+                color=regressline_color, linewidth=regressline_width, zorder=100)
+
+    # 画背景填充线
+    if scatter_fill is not None:
+        delta = x - y
+        fill_color = scatter_fill.get("fill_color")
+        fill_step = scatter_fill.get("fill_step")
+        T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xmin,
+                                                            xmax, fill_step)
+        ax.plot(T_seg, mean_seg, 'o-',
+                ms=6, lw=0.6, c=fill_color,
+                mew=0, zorder=50)
+        ax.fill_between(T_seg, mean_seg - std_seg, mean_seg + std_seg,
+                        facecolor=fill_color, edgecolor=fill_color,
+                        interpolate=True, alpha=0.4, zorder=100)
 
     # 画 avx 注释线
     if avxline is not None:
         avxline_x = avxline.get("line_x")
-        avxline_color = avxline.get("x_color")
+        avxline_color = avxline.get("line_color")
         avxline_width = 0.7
         avxline_word = avxline.get("word")
         avxline_wordcolor = avxline.get("word_color")
@@ -609,6 +629,69 @@ def draw_histogram(ax, x, y=None, x_label=None, y_label=None, ax_annotate={},
     add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
     add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
     add_xylabel(ax, x_label, y_label)
+    set_tick_font(ax)
+
+
+def draw_bar(ax, x, y, label=None, ax_annotate=None,
+             xmin=None, xmax=None, ymin=None, ymax=None, gab_y=7, gab_x=5.0,
+             bar=None,):
+    """
+    """
+    print xmin, xmax
+    if None in [xmin, xmax]:
+        xmin = floor(np.min(x))
+        xmax = ceil(np.max(x))
+    if None in [ymin, ymax]:
+        ymin = floor(np.min(y))
+        ymax = ceil(np.max(y))
+
+    # 设置 x y 坐标轴范围
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # 设置 x y 轴的刻度
+    major_x = (xmax - xmin) / gab_x
+    minor_x = major_x / 2.0
+    major_y = (ymax - ymin) / gab_y
+    minor_y = major_y / 2.0
+    if isinstance(major_x, float):
+        major_x = float('%.5f' % major_x)
+        minor_x = float('%.5f' % minor_x)
+    if isinstance(major_y, float):
+        major_y = float('%.5f' % major_y)
+        minor_y = float('%.5f' % minor_y)
+    # ax.xaxis.set_major_locator(MultipleLocator(major_x))
+    # ax.xaxis.set_minor_locator(MultipleLocator(minor_x))
+    ax.yaxis.set_major_locator(MultipleLocator(major_y))
+    ax.yaxis.set_minor_locator(MultipleLocator(minor_y))
+
+    if bar is not None:
+        delta = x - y
+        bar_step = bar.get("bar_step")
+        bar_width = bar.get("bar_width")
+        bar_color = bar.get("BlUE")
+        T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xmin,
+                                                            xmax, bar_step)
+        plt.bar(T_seg, np.log10(sampleNums), width=bar_width, align="center",
+                color=bar_color, linewidth=0)
+        for i, T in enumerate(T_seg):
+            if sampleNums[i] > 0:
+                plt.text(T, np.log10(sampleNums[i]) + 0.2,
+                         '%d' % int(sampleNums[i]), ha="center",
+                         fontsize=6, fontproperties=FONT_MONO)
+
+    # 注释，格式 ['annotate1', 'annotate2']
+    if ax_annotate is not None:
+        font_size = 10
+        add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
+        add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
+
+    # 标签
+    if label is not None:
+        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+
+    # 设置 tick 字体
     set_tick_font(ax)
 
 

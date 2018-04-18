@@ -22,7 +22,7 @@ from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
 from DV.dv_pub_3d import plt, add_annotate, set_tick_font, FONT0, FONT_MONO,\
-    draw_distribution
+    draw_distribution, draw_bar, draw_histogram, bias_information
 from PB import pb_time, pb_io
 from plt_io import ReadHDF5, loadYamlCfg
 
@@ -213,9 +213,6 @@ def plot(x, y, weight, picPath,
     w = w[idx] if weight is not None else None
     # -----------------------------------------
 
-    # 修改偏差值为国内减国外： x - y
-    delta = x - y
-
     if xname == "tbb":
         step = 5
     else:
@@ -226,8 +223,8 @@ def plot(x, y, weight, picPath,
 
     # 开始绘图
     fig = plt.figure(figsize=(6, 5))
-    ax1 = plt.subplot2grid((1, 2), (0, 0))
-    ax2 = plt.subplot2grid((1, 2), (0, 1))
+    ax1 = plt.subplot2grid((2, 1), (0, 0))
+    ax2 = plt.subplot2grid((2, 1), (1, 0))
     # 图片 Title
     title = '%s Bias Monthly Statistics\n%s Minus %s  %s  %s' % \
             (xname_l, part1, part2, chan, DayOrNight)
@@ -247,125 +244,120 @@ def plot(x, y, weight, picPath,
         ymax_distri = None
 
     # Distri label
-    label = {}
-    ylabel = 'D%s' % (xname_l) + ('($%s$)' % xunit if xunit != "" else "")
-    label["ylabel"] = ylabel
+    distri_label = {}
+    if xunit != "":
+        ylabel = 'D{}({})'.format(xname_l, xunit)
+    else:
+        ylabel = "D{}".format(xname_l)
+    distri_label["ylabel"] = ylabel
 
     ref_temp = reference_list[0]  # 获取拟合系数
 
+    # 获取 MeanBias 信息
+    bias_info = bias_information(x, y, 0.1)
+
+    # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
+    ab = polyfit(x, y, 1)
+    a = ab[0]
+    b = ab[1]
+    if xname == 'tbb':
+        bias_info_md = "TBB Bias ({} K) : {:.4f} K".format(
+            ref_temp, ref_temp * a + b - ref_temp)
+    elif xname == 'ref':
+        bias_info_md = "Relative Bias (REF {}) : {:.4f} %".format(
+            ref_temp, (ref_temp * a + b) / ref_temp * 100)
+    else:
+        bias_info_md = ""
+
+    # 配置注释信息
+    distri_annotate = {"left": [bias_info.get("info_lower"),
+                                bias_info.get("info_greater"),
+                                bias_info_md]}
+    # 注释线配置
     if xname == "tbb":
         avxline = {
             'line_x': ref_temp, 'line_color': '#4cd964', 'line_width': 0.7,
             'word': str(ref_temp) + xunit, 'word_color': EDGE_GRAY,
             'word_size': 6, 'word_location': (ref_temp, -3.5)
         }
-        annotate3 = "TBB Bias ({} K) : {:.4f} K".format(
-            ref_temp, ref_temp * a + b - ref_temp)
-        ax_annotate = {"left": [annotate3], "right": []}
     elif xname == "ref":
         avxline = {
             'line_x': ref_temp, 'line_color': '#4cd964', 'line_width': 0.7,
             'word': str(ref_temp) + xunit, 'word_color': EDGE_GRAY,
             'word_size': 6, 'word_location': (ref_temp, -0.07)
         }
-        annotate3 = "Relative Bias (REF {}) : {:.4f} %".format(
-            ref_temp, (ref_temp * a + b) / ref_temp * 100)
-        ax_annotate = {"left": [annotate3], "right": []}
     else:
         avxline = None
-        ax_annotate = None
+        distri_annotate = None
 
-    draw_distribution(ax1, x, y, label=label, ax_annotate=ax_annotate,
+    # y=0 线配置
+    zeroline = {"line_color": '#808080', "line_width": 1.0}
+
+    # 偏差点配置
+    scatter_delta = {
+        "scatter_marker": 'o', "scatter_size": 1.5, "scatter_alpha": 0.5,
+        "scatter_linewidth": 0, "scatter_zorder": 100, "scatter_color": BLUE,
+    }
+    # 偏差 fill 配置
+    scatter_fill = {
+        "fill_marker": 'o-', "fill_size": 6, "fill_alpha": 0.5,
+        "fill_linewidth": 0.6, "fill_zorder": 50, "fill_color": RED,
+        "fill_step": step,
+    }
+
+    draw_distribution(ax1, x, y, label=distri_label,
+                      ax_annotate=distri_annotate,
                       xmin=xmin_distri, xmax=xmax_distri,
                       ymin=ymin_distri, ymax=ymax_distri,
-                      avxline=avxline)
+                      avxline=avxline, zeroline=zeroline,
+                      scatter_delta=scatter_delta, scatter_fill=scatter_fill,
+                      )
 
-    # strlist_ax1 = [[]]
-    # strlist_ax2 = [[]]
-    #
-    # for ref_temp in reference_list:
-    #     ax1.axvline(x=ref_temp, color='#4cd964', lw=0.7)
-    #     if xname == "tbb":
-    #         ax1.annotate(str(ref_temp) + xunit, (ref_temp, -3.5),
-    #                      va="top", ha="center", color=EDGE_GRAY,
-    #                      size=6, fontproperties=FONT_MONO)
-    #     elif xname == "ref":
-    #         ax1.annotate(str(ref_temp) + xunit, (ref_temp, -0.07),
-    #                      va="top", ha="center", color=EDGE_GRAY,
-    #                      size=6, fontproperties=FONT_MONO)
-    #     strlist_ax1[0].append("%s Bias %s: %6.3f" %
-    #                           (xname_l, str(ref_temp) + xunit, ref_temp * a + b - ref_temp))
-    strlist_ax2[0].append('Total Number: %7d' % len(x))
+    # 绘制 Bar 图 -------------------------------------------------
 
-    T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xlim_min,
-                                                        xlim_max, step)
-    plt.plot(x, delta, 'o', ms=1.5,
-             markerfacecolor=BLUE, alpha=0.5,
-             mew=0, zorder=10)
-    plt.plot(T_seg, mean_seg, 'o-',
-             ms=6, lw=0.6, c=RED,
-             mew=0, zorder=50)
-    # 添加y=0的线
-    COLOR_Darkgray = '#808080'
-    plt.plot([xmin, xmax], [0, 0],
-             color=COLOR_Darkgray, linewidth=1.0)
-
-    plt.fill_between(T_seg, mean_seg - std_seg, mean_seg + std_seg,
-                     facecolor=RED, edgecolor=RED,
-                     interpolate=True, alpha=0.4, zorder=100)
-
-    add_annotate(ax1, strlist_ax1, 'left', EDGE_GRAY, 9)
-
-    plt.ylabel(ylabel, fontsize=11, fontproperties=FONT0)
-    plt.grid(True)
-    plt.title(title, fontsize=12, fontproperties=FONT0)
-    set_tick_font(ax1)
-    plt.setp(ax1.get_xticklabels(), visible=False)
-
-    # point number -------------------------------------------------
-    # y 轴范围
-
-    ax2.set_ylim(0, 7)
-    ax2.yaxis.set_major_locator(MultipleLocator(1))
-    ax2.yaxis.set_minor_locator(MultipleLocator(0.2))
-    plt.sca(ax2)
+    # bar 的宽度
     if xname == "tbb":
         width = 3
     elif xname == "ref":
         width = 0.07
-    plt.bar(T_seg, np.log10(sampleNums), width=width, align="center",
-            color=BLUE, linewidth=0)
-    for i, T in enumerate(T_seg):
-        if sampleNums[i] > 0:
-            plt.text(T, np.log10(sampleNums[i]) + 0.2, '%d' % int(sampleNums[i]), ha="center",
-                     fontsize=6, fontproperties=FONT_MONO)
+    else:
+        width = 1
+    # bar 配置
+    bar = {
+        "bar_width": width, "bar_color": BLUE, "bar_linewidth": 0,
+        "text_size": 6, "text_font": FONT_MONO, "bar_step": step,
+    }
+    bar_annotate = {
+       "left": ['Total Number: %7d' % len(x)]
+    }
+    bar_label = {
+        "xlabel": '%s %s' % (part2, xname_l) + ('($%s$)' % xunit if xunit != "" else ""),
+        "ylabel": 'Number of sample points\nlog (base = 10)'
+    }
 
-    add_annotate(ax2, strlist_ax2, 'left', EDGE_GRAY, 9)
-    plt.ylabel('Number of sample points\nlog (base = 10)', fontsize=11, fontproperties=FONT0)
-    xlabel = '%s %s' % (part2, xname_l) + ('($%s$)' % xunit if xunit != "" else "")
-    plt.xlabel(xlabel, fontsize=11, fontproperties=FONT0)
-    plt.grid(True)
-    set_tick_font(ax2)
+    ymin_bar = 0
+    ymax_bar = 7
+    draw_bar(ax2, x, y, label=bar_label, ax_annotate=bar_annotate,
+             xmin=xmin_distri, xmax=xmax_distri,
+             ymin=ymin_bar, ymax=ymax_bar,
+             bar=bar,
+             )
 
-    #---------------
+    # ---------------
     plt.tight_layout()
+    # 将 ax1 的 xticklabels 设置为不可见
+    plt.setp(ax1.get_xticklabels(), visible=False)
+
+    # 子图的底间距
     fig.subplots_adjust(bottom=0.16)
-
-#     circle1 = mpatches.Circle((74, 18), 5, color=BLUE, ec=EDGE_GRAY, lw=0)
-#     circle2 = mpatches.Circle((164, 18), 5, color=RED, ec=EDGE_GRAY, lw=0)
-#     fig.patches.extend([circle1, circle2])
-#
-#     fig.text(0.15, 0.02, 'Daily', color=BLUE, fontproperties=FONT0)
-#     fig.text(0.3, 0.02, 'Monthly', color=RED, fontproperties=FONT0)
-
-    fig.text(0.6, 0.02, '%s' % ym, fontproperties=FONT0)
-    fig.text(0.8, 0.02, ORG_NAME, fontproperties=FONT0)
-    #---------------
+    fig.text(0.6, 0.02, '%s' % ym, fontsize=11, fontproperties=FONT0)
+    fig.text(0.8, 0.02, ORG_NAME, fontsize=11, fontproperties=FONT0)
+    # ---------------
 
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     fig.savefig(picPath)
     plt.close()
-    fig.clear
+    fig.clear()
 
 
 def G_reg1d(xx, yy, ww=None):
