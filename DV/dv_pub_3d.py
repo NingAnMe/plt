@@ -151,9 +151,9 @@ def draw_histogram(filename, dvalues, titledict, tl_list, tr_list):
 
 
 def set_tick_font(ax, scale_size=SCALE_SIZE):
-    '''
+    """
     设定刻度的字体
-    '''
+    """
     for tick in ax.xaxis.get_major_ticks():
         tick.label1.set_fontproperties(FONT0)
         tick.label1.set_fontsize(scale_size)
@@ -163,9 +163,9 @@ def set_tick_font(ax, scale_size=SCALE_SIZE):
 
 
 def add_title(titledict):
-    '''
+    """
     添加大标题和xy轴名称
-    '''
+    """
     tt = plt.title(titledict['title'], fontsize=11, fontproperties=FONT0)
     tt.set_y(1.01)  # set gap space below title and subplot
     if 'xlabel' in titledict.keys() and titledict['xlabel'] != '':
@@ -174,43 +174,67 @@ def add_title(titledict):
         plt.ylabel(titledict['ylabel'], fontsize=11, fontproperties=FONT0)
 
 
+def add_fig_title(_ax, fig_title, fig_gap=1.01):
+    """
+    添加图片标题，并且设置与子图的间距
+    :param _ax:
+    :param fig_title:
+    :param fig_gap:
+    :return:
+    """
+    tt = plt.title(fig_title, fontsize=11, fontproperties=FONT0)
+    tt.set_y(fig_gap)  # set gap space below title and subplot
+
+
 def add_xylabel(ax, xlabel, ylabel):
-    '''
+    """
     添加xy轴名称
-    '''
+    :param ax: plt.ax
+    :param xlabel: 字符串
+    :param ylabel: 字符串
+    :return:
+    """
     ax.set_xlabel(xlabel, fontsize=11, fontproperties=FONT0)
     ax.set_ylabel(ylabel, fontsize=11, fontproperties=FONT0)
 
 
 def add_annotate(ax, strlist, loc, color='#303030', fontsize=11):
-    '''
+    """
     添加上方注释文字
     loc must be 'left' or 'right'
-    '''
-    if strlist is None: return
-#     if loc == 'left':
-#         flag = 1.
-#     elif loc == 'right':
-#         flag = -1.
-#     else:
-#         return
-#     to_edge = 8.  # 离边缘的距离
-#     line_height = 14.  # 注释文字行的高度
-#     col_width = 90.  # 注释文字列的宽度
-#     x = to_edge
-#     for eachCol in strlist:
-#         y = to_edge * -1.
-#         for each_str in eachCol:
-#             ax.annotate(each_str, (x * flag, y),
-#                         xycoords='axes points', va="top", ha=loc,
-#                         size=10, color=color, fontproperties=FONT0)
-#             y = y - line_height
-#         x = x + col_width
+    格式[['annotate1', 'annotate2']]
+    """
+    if strlist is None:
+        return
+    xticklocs = ax.xaxis.get_ticklocs()
+    yticklocs = ax.yaxis.get_ticklocs()
 
-#     print  ax.get_position().get_points()[0]
-#     print  ax.get_position().get_points()[1]
-#     print ax.get_position().height
+    x_step = (xticklocs[1] - xticklocs[0])
+    x_toedge = x_step / 6.
+    y_toedge = (yticklocs[1] - yticklocs[0]) / 6.
 
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    if loc == 'left':
+        ax.text(xlim[0] + x_toedge, ylim[1] - y_toedge,
+                '\n'.join(strlist), ha=loc, va='top', color=color,
+                fontsize=fontsize, fontproperties=FONT_MONO)
+        x_toedge = x_toedge + x_step * 1.4
+    elif loc == 'right':
+        ax.text(xlim[1] - x_toedge, ylim[1] - y_toedge,
+                '\n'.join(strlist), ha=loc, va='top', color=color,
+                fontsize=fontsize, fontproperties=FONT_MONO)
+        x_toedge = x_toedge + x_step * 1.4
+
+
+def add_annotate_bak(ax, strlist, loc, color='#303030', fontsize=11):
+    """
+    添加上方注释文字
+    loc must be 'left' or 'right'
+    格式[['annotate1', 'annotate2']]
+    """
+    if strlist is None:
+        return
     xticklocs = ax.xaxis.get_ticklocs()
     yticklocs = ax.yaxis.get_ticklocs()
 
@@ -234,14 +258,54 @@ def add_annotate(ax, strlist, loc, color='#303030', fontsize=11):
             x_toedge = x_toedge + x_step * 1.4
 
 
+def day_data_write(title, data, outFile):
+    """
+    title: 标题
+    data： 数据体
+    outFile:输出文件
+    """
+
+    allLines = []
+    DICT_D = {}
+    FilePath = os.path.dirname(outFile)
+    if not os.path.exists(FilePath):
+        os.makedirs(FilePath)
+
+    if os.path.isfile(outFile) and os.path.getsize(outFile) != 0:
+        fp = open(outFile, 'r')
+        fp.readline()
+        Lines = fp.readlines()
+        fp.close()
+        # 使用字典特性，保证时间唯一，读取数据
+        for Line in Lines:
+            DICT_D[Line[:8]] = Line[8:]
+        # 添加或更改数据
+        Line = data
+        DICT_D[Line[:8]] = Line[8:]
+        # 按照时间排序
+
+        newLines = sorted(DICT_D.iteritems(), key=lambda d: d[0], reverse=False)
+        for i in xrange(len(newLines)):
+            allLines.append(str(newLines[i][0]) + str(newLines[i][1]))
+        fp = open(outFile, 'w')
+        fp.write(title)
+        fp.writelines(allLines)
+        fp.close()
+    else:
+        fp = open(outFile, 'w')
+        fp.write(title)
+        fp.writelines(data)
+        fp.close()
+
+
 def draw_Scatter(x, y, filename, titledict, tl_list, tr_list,
                  xmin=None, xmax=None, ymin=None, ymax=None, diagonal=True):
-    '''
+    """
     画散点回归线图
     x: modis
     y: mersi
     d: mesi - modis
-    '''
+    """
     ab = np.polyfit(x, y, 1)
     if None in [xmin, xmax, ymin, ymax]:
         xmin = floor(np.min(x))
@@ -256,17 +320,17 @@ def draw_Scatter(x, y, filename, titledict, tl_list, tr_list,
 
     # 对角线
     if diagonal:
-        # 设定x y 轴的范围
+        # 设定 x y 轴的范围
         xylimMax = max(xmax, ymax)
         xylimMin = min(xmin, ymin)
         plt.xlim(xylimMin, xylimMax)
         plt.ylim(xylimMin, xylimMax)
         xmax = xylimMax
         xmin = xylimMin
-        plt.plot([xylimMin, xylimMax], [xylimMin, xylimMax], color='#cccccc', linewidth=0.6)
+        plt.plot([xylimMin, xylimMax], [xylimMin, xylimMax], color='#aaaaaa', linewidth=1)
 
     else:
-        # 设定x y 轴的范围
+        # 设定 x y 轴的范围
         plt.xlim(xmin, xmax)
         plt.ylim(ymin, ymax)
 
@@ -295,13 +359,221 @@ def draw_Scatter(x, y, filename, titledict, tl_list, tr_list,
     plt.close()
 
 
+def draw_regression(ax, x, y, x_label=None, y_label=None, ax_annotate={},
+                    xmin=None, xmax=None, ymin=None, ymax=None, gab_number=5,
+                    is_diagonal=False):
+    """
+    画回归线图
+    :param ax:
+    :param x:
+    :param y:
+    :param x_label:
+    :param y_label:
+    :param ax_annotate: 注释
+    :param xmin:
+    :param xmax:
+    :param ymin:
+    :param ymax:
+    :param gab_number: 间隔数量
+    :param is_diagonal: 是否画对角线
+    :return:
+    """
+    if None in [xmin, xmax, ymin, ymax]:
+        xmin = floor(np.min(x))
+        xmax = ceil(np.max(x))
+        ymin = floor(np.min(y))
+        ymax = ceil(np.max(y))
+
+    # 设定x y 轴的范围
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # 计算 a b
+    ab = np.polyfit(x, y, 1)
+    a = ab[0]
+    b = ab[1]
+
+    # 画对角线
+    diagonal_color = '#808080'
+    diagonal_lw = 1.2
+    if is_diagonal:
+        ax.plot([xmin, xmax], [ymin, ymax], color=diagonal_color,
+                linewidth=diagonal_lw)
+
+    # 画回归线
+    ax.plot([xmin, xmax], [xmin * a + b, xmax * a + b],
+            color='r', linewidth=1.2, zorder=100)
+
+    # 画散点
+    alpha_value = 0.8  # 透明度
+    marker_value = 'o'  # 形状
+    color_value = 'b'  # 颜色
+    ax.scatter(x, y, s=5, marker=marker_value, c=color_value, lw=0, alpha=alpha_value)
+
+    # 设定小刻度
+    xticklocs = ax.xaxis.get_ticklocs()
+    yticklocs = ax.yaxis.get_ticklocs()
+    ax.xaxis.set_minor_locator(MultipleLocator((xticklocs[1] - xticklocs[0]) / gab_number))
+    ax.yaxis.set_minor_locator(MultipleLocator((yticklocs[1] - yticklocs[0]) / gab_number))
+
+    # 注释，格式['annotate1', 'annotate2']
+    add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
+    add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
+    add_xylabel(ax, x_label, y_label)
+    set_tick_font(ax)
+
+
+def bias_information(x, y, percent=0.1):
+    """
+    # 过滤 range%10 范围的值，计算偏差信息
+    # MeanBias( <= 10 % Range) = MD±Std @ MT
+    # MeanBias( > 10 % Range) = MD±Std @ MT
+    :param x:
+    :param y:
+    :param percent:
+    :return: MD Std MT 偏差均值 偏差 std 样本均值
+    """
+    # 计算偏差
+    delta = x - y
+
+    range_percent = (delta.min() + (delta.max() - delta.min())) * percent
+    idx_greater = np.where(delta > range_percent)
+    delta_greater = delta[idx_greater]
+    x_greater = x[idx_greater]
+
+    idx_lower = np.where(delta <= range_percent)
+    delta_lower = delta[idx_lower]
+    x_lower = x[idx_lower]
+
+    md_greater = delta_greater.mean()  # 偏差均值
+    std_greater = delta_greater.std()  # 偏差 std
+    mt_greater = x_greater.mean()  # 样本均值
+
+    md_lower = delta_lower.mean()
+    std_lower = delta_lower.std()
+    mt_lower = x_lower.mean()
+
+    info_lower = "MeanBias(<=10%Range)={:.4f}±{:.4f}@{:.4f}".format(
+        md_lower, std_lower, mt_lower)
+    info_greater = "MeanBias(>10%Range) ={:.4f}±{:.4f}@{:.4f}".format(
+        md_greater, std_greater, mt_greater)
+
+    bias_info = {"md_greater": md_greater, "std_greater": std_greater,
+                 "mt_greater": mt_greater,
+                 "md_lower": md_lower, "std_lower": std_lower,
+                 "mt_lower": mt_lower,
+                 "info_lower": info_lower, "info_greater": info_greater}
+
+    return bias_info
+
+
+def draw_distribution(ax, x, y, x_label=None, y_label=None, ax_annotate={},
+                      xmin=None, xmax=None, ymin=None, ymax=None, gab_number=8.0,
+                      is_diagonal=False):
+    """
+    画偏差分布图
+    :return:
+    """
+    if None in [xmin, xmax]:
+        xmin = floor(np.min(x))
+        xmax = ceil(np.max(x))
+    if None in [ymin, ymax]:
+        ymin = floor(np.min(y))
+        ymax = ceil(np.max(y))
+
+    # 设置 x y 坐标轴范围
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # format the Yticks
+    ax.yaxis.set_major_locator(MultipleLocator((ymax - ymin) / gab_number))
+    ax.yaxis.set_minor_locator(MultipleLocator((ymax - ymin) / gab_number / 2))
+
+    # 添加 y = 0 的线
+    line_color = '#808080'
+    ax.plot([xmin, xmax], [0, 0], color=line_color, linewidth=1.0)
+
+    # 计算偏差
+    delta = x - y
+
+    # 画偏差散点
+    alpha_value = 0.8  # 透明度
+    marker_value = 'o'  # 形状
+    color_value = 'b'  # 颜色
+    ax.scatter(x, delta, s=5, marker=marker_value, c=color_value, lw=0, alpha=alpha_value)
+
+    # 画偏差回归
+    delt_ab = np.polyfit(x, delta, 1)
+    delt_a = delt_ab[0]
+    delt_b = delt_ab[1]
+    ax.plot([xmin, xmax],
+            [xmin * delt_a + delt_b, xmax * delt_a + delt_b],
+            color='r', linewidth=1.2, zorder=100)
+
+    # 注释，格式['annotate1', 'annotate2']
+    add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
+    add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
+    add_xylabel(ax, x_label, y_label)
+    set_tick_font(ax)
+
+
+def draw_histogram(ax, x, y=None, x_label=None, y_label=None, ax_annotate={},
+                   hist_label_x='X', hist_label_y='Y',
+                   xmin=None, xmax=None, ymin=None, ymax=None, gab_number=8.0,
+                   is_diagonal=False):
+    """
+    画直方图
+    :param hist_label_y:
+    :param hist_label_x:
+    :param ax:
+    :param x:
+    :param y: 如果绘制 y ，需要和 x 的坐标轴相同
+    :param x_label:
+    :param y_label:
+    :param ax_annotate:
+    :param xmin:
+    :param xmax:
+    :param ymin:
+    :param ymax:
+    :param gab_number:
+    :param is_diagonal:
+    :return:
+    """
+    if ax_annotate is None:
+        ax_annotate = {}
+    if None in [xmin, xmax,]:
+        xmin = floor(np.min(x))
+        xmax = ceil(np.max(x))
+
+    alpha = 0.4
+    color_x = "red"
+    hist_label_x = hist_label_x
+    ax.hist(x, 100, range=(xmin, xmax), histtype='bar', color=color_x,
+            label=hist_label_x, alpha=alpha)
+
+    if y is not None:
+        color_y = "blue"
+        hist_label_y = hist_label_y
+        ax.hist(y, 100, range=(xmin, xmax), histtype='bar', color=color_y,
+                label=hist_label_y, alpha=alpha)
+
+    # 设置标签
+    ax.legend(prop={'size': 10})
+    # 注释，格式['annotate1', 'annotate2']
+    add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
+    add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
+    add_xylabel(ax, x_label, y_label)
+    set_tick_font(ax)
+
+
 def draw_Scatter_Bar(x, y, filename, titledict, tl_list, tr_list, part1, part2, xname, xname_l,
                  xmin=None, xmax=None, ymin=None, ymax=None):
-    '''
+    """
     画散点回归线图 和 直方图
     x: modis
     y: mersi
-    '''
+    """
+    print 'bar 1'
     ab = np.polyfit(x, y, 1)
     if None in [xmin, xmax, ymin, ymax]:
         xmin = floor(np.min(x))
@@ -311,29 +583,34 @@ def draw_Scatter_Bar(x, y, filename, titledict, tl_list, tr_list, part1, part2, 
 
     fig = plt.figure(figsize=(14, 4.5))
     fig.subplots_adjust(top=0.92, bottom=0.11, left=0.045, right=0.985)
-
+    print 'bar 1.1'
     alpha = 0.4
+    print 'bar 1.1.1'
     # 散点图 --------------------------
-    ax1 = fig.add_subplot(131)
-    ax1.grid(True)
+    try:
+        ax1 = fig.add_subplot(131)
+    except Exception, why:
+        print why
     # 对角线
     # 设定x y 轴的范围
+    print 'bar 1.2'
     xylimMax = max(xmax, ymax)
     xylimMin = min(xmin, ymin)
     ax1.set_xlim(xylimMin, xylimMax)
     ax1.set_ylim(xylimMin, xylimMax)
     xmax = xylimMax
     xmin = xylimMin
-    ax1.plot([xylimMin, xylimMax], [xylimMin, xylimMax], color='#cccccc', linewidth=0.6)
-
+    print 'bar 2'
+    ax1.plot([xylimMin, xylimMax], [xylimMin, xylimMax], color='#808080', linewidth=1.0)
+    print 'bar 3'
     # 回归线
     ax1.plot([xmin, xmax], [ab[0] * xmin + ab[1], ab[0] * xmax + ab[1]],
              color='r', linewidth=1.2, zorder=100)
-
+    print 'bar 4'
     # 画散点
     colorValues = 'b'
     ax1.scatter(x, y, s=5, marker='o', c=colorValues, lw=0, alpha=alpha)
-
+    print 'bar 5'
     # 设定小刻度
     xticklocs = ax1.xaxis.get_ticklocs()
     yticklocs = ax1.yaxis.get_ticklocs()
@@ -344,14 +621,14 @@ def draw_Scatter_Bar(x, y, filename, titledict, tl_list, tr_list, part1, part2, 
     add_annotate(ax1, tr_list, 'right')  #  '#9300d3'
     add_xylabel(ax1, titledict["xlabel"], titledict["ylabel"])
     set_tick_font(ax1)
-
+    print 'bar 6'
     # 直方图 ---------------------------------------
 
     ax2 = fig.add_subplot(133)
     ax2.grid(True)
     color = "red"
     ax2.hist(x, 100, range=(xmin, xmax), histtype='bar', color=color, label=part1, alpha=alpha)
-
+    print 'bar 7'
     color = "blue"
     ax2.hist(y, 100, range=(xmin, xmax), histtype='bar', color=color, label=part2, alpha=alpha)
     ax2.legend(prop={'size': 10})
@@ -373,10 +650,31 @@ def draw_Scatter_Bar(x, y, filename, titledict, tl_list, tr_list, part1, part2, 
         ax3.yaxis.set_major_locator(MultipleLocator(0.04))
         ax3.yaxis.set_minor_locator(MultipleLocator(0.008))
     delta = x - y
-    # 添加y=0的线
-    COLOR_Darkgray = '#000000'
-    ax3.plot([xmin, xmax], [0, 0],
-             color=COLOR_Darkgray, linewidth=0.6)
+
+    # 过滤 range%10 范围的值，计算偏差信息
+    # MeanBias( <= 10 % Range) = MD±Std @ MT
+    # MeanBias( > 10 % Range) = MD±Std @ MT
+    range_10 = (delta.min() + (delta.max() - delta.min())) * 0.1
+    idx_greater_10 = np.where(delta > range_10)
+    delta_greater_10 = delta[idx_greater_10]
+    x_greater_10 = x[idx_greater_10]
+
+    idx_lower_10 = np.where(delta <= range_10)
+    delta_lower_10 = delta[idx_lower_10]
+    x_lower_10 = x[idx_lower_10]
+
+    md_greater_10 = delta_greater_10.mean()  # 偏差均值
+    std_greater_10 = delta_greater_10.std()  # 偏差 std
+    mt_greater_10 = x_greater_10.mean()  # 样本均值
+
+    md_lower_10 = delta_lower_10.mean()
+    std_lower_10 = delta_lower_10.std()
+    mt_lower_10 = x_lower_10.mean()
+
+    # 添加 y = 0 的线
+    COLOR_Darkgray = '#808080'
+    ax3.plot([xmin, xmax], [0, 0], color=COLOR_Darkgray, linewidth=1.0)
+
     # 散点
     ax3.scatter(x, delta, s=5, marker='o', c=colorValues, lw=0, alpha=alpha)
     delt_ab = np.polyfit(x, delta, 1)
@@ -389,15 +687,16 @@ def draw_Scatter_Bar(x, y, filename, titledict, tl_list, tr_list, part1, part2, 
     plt.savefig(filename)
     fig.clear()
     plt.close()
+    print 'bar 8'
 
 
 def draw_Scatter_withColorbar(x, y, filename, titledict, tl_list, tr_list):
-    '''
+    """
     画散点回归线图
     x: modis
     y: mersi
     d: mesi - modis
-    '''
+    """
     ab = np.polyfit(x, y, 1)
     xmin = floor(np.min(x))
     xmax = ceil(np.max(x))
@@ -416,7 +715,7 @@ def draw_Scatter_withColorbar(x, y, filename, titledict, tl_list, tr_list):
     plt.ylim(xylimMin, xylimMax)
 
     # 对角线
-    plt.plot([xylimMin, xylimMax], [xylimMin, xylimMax], color='#ADADAD', linewidth=1)
+    plt.plot([xylimMin, xylimMax], [xylimMin, xylimMax], color='#808080', linewidth=1)
 
     # 回归线
     plt.plot([xylimMin, xylimMax], [ab[0] * xylimMin + ab[1], ab[0] * xylimMax + ab[1]], color='r',
@@ -457,44 +756,38 @@ def draw_Scatter_withColorbar(x, y, filename, titledict, tl_list, tr_list):
     return
 
 
-def draw_density(x, y, filename, titledict, tl_list, tr_list,
-                 xmin=None, xmax=None, ymin=None, ymax=None, diagonal=True):
+def draw_density(ax, x, y, x_label=None, y_label=None, ax_annotate={},
+                 xmin=None, xmax=None, ymin=None, ymax=None, gab_number=5,
+                 is_diagonal=False):
     """
     绘制密度图
     :return:
     """
-    ab = np.polyfit(x, y, 1)
     if None in [xmin, xmax, ymin, ymax]:
         xmin = floor(np.min(x))
         xmax = ceil(np.max(x))
         ymin = floor(np.min(y))
         ymax = ceil(np.max(y))
 
-    fig = plt.figure(figsize=(6, 4))
-    fig.subplots_adjust(top=0.93, bottom=0.12, left=0.11, right=0.96)
+    # 设定x y 轴的范围
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
 
-    plt.grid(True)
+    # 计算 a b
+    ab = np.polyfit(x, y, 1)
+    a = ab[0]
+    b = ab[1]
 
-    # 对角线
-    if diagonal:
-        # 设定x y 轴的范围
-        xylimMax = max(xmax, ymax)
-        xylimMin = min(xmin, ymin)
-        plt.xlim(xylimMin, xylimMax)
-        plt.ylim(xylimMin, xylimMax)
-        xmax = xylimMax
-        xmin = xylimMin
-        plt.plot([xylimMin, xylimMax], [xylimMin, xylimMax], color='#cccccc', linewidth=0.6)
+    # 画对角线
+    diagonal_color = '#808080'
+    diagonal_lw = 1.2
+    if is_diagonal:
+        ax.plot([xmin, xmax], [ymin, ymax], color=diagonal_color,
+                linewidth=diagonal_lw)
 
-    else:
-        # 设定x y 轴的范围
-        plt.xlim(xmin, xmax)
-        plt.ylim(ymin, ymax)
-
-    # 回归线
-
-    plt.plot([xmin, xmax], [ab[0] * xmin + ab[1], ab[0] * xmax + ab[1]],
-             color='r', linewidth=1, zorder=100)
+    # 画回归线
+    ax.plot([xmin, xmax], [xmin * a + b, xmax * a + b],
+            color='r', linewidth=1.2, zorder=100)
 
     # 画密度点
     pos = np.vstack([x, y])
@@ -502,23 +795,21 @@ def draw_density(x, y, filename, titledict, tl_list, tr_list,
     z = kernel(pos)
     norm = plt.Normalize()
     norm.autoscale(z)
-    plt.scatter(x, y, c=z, norm=norm, s=5, marker="o", cmap=plt.cm.jet, lw=0, alpha=1)
-
-    ax = plt.gca()
+    ax.scatter(x, y, c=z, norm=norm, s=5, marker="o", cmap=plt.cm.jet, lw=0, alpha=1)
 
     # 设定小刻度
     xticklocs = ax.xaxis.get_ticklocs()
     yticklocs = ax.yaxis.get_ticklocs()
-    ax.xaxis.set_minor_locator(MultipleLocator((xticklocs[1] - xticklocs[0]) / 5))
-    ax.yaxis.set_minor_locator(MultipleLocator((yticklocs[1] - yticklocs[0]) / 5))
+    ax.xaxis.set_minor_locator(
+        MultipleLocator((xticklocs[1] - xticklocs[0]) / gab_number))
+    ax.yaxis.set_minor_locator(
+        MultipleLocator((yticklocs[1] - yticklocs[0]) / gab_number))
 
-    add_annotate(ax, tl_list, 'left')  # 注释文字
-    add_annotate(ax, tr_list, 'right')  #  '#9300d3'
-    add_title(titledict)
+    # 注释，格式['annotate1', 'annotate2']
+    add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
+    add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
+    add_xylabel(ax, x_label, y_label)
     set_tick_font(ax)
-    plt.savefig(filename)
-    fig.clear()
-    plt.close()
 
 
 def add_colorbar_right_vertical(fig, colorMin, colorMax,
@@ -548,9 +839,9 @@ def add_colorbar_right_vertical(fig, colorMin, colorMax,
 
 
 def get_dot_color(xlist, ylist):
-    '''
+    """
     取得color数组
-    '''
+    """
     divide = 200.  # 分成200份
     colors = np.zeros(len(xlist))
     xmin = floor(np.min(xlist))
@@ -578,9 +869,9 @@ def get_dot_color(xlist, ylist):
 
 
 def draw_time_fig(time_list, data_dic, picPath, titledict, Rate, tl_list=None):
-    '''
+    """
     画时序图
-    '''
+    """
     fig_height = 4.
     # fig_width = max(int(len(time_list)* 0.8), fig_height+1.)
     fig_width = fig_height * 6. / 4.

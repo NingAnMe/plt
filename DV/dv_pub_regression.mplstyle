@@ -8,20 +8,19 @@
 figure.facecolor: white
 
 # grid
-grid.color: .8
-grid.linestyle: .
-grid.color: 303030
+grid.color: .15
+grid.linestyle: -.
 
 # axes
 axes.axisbelow: True
 axes.grid: True
 axes.facecolor: white
-axes.edgecolor: 0.76
+axes.edgecolor: 303030
 axes.linewidth: 0.8
 axes.labelcolor: 303030
 
+# text
 text.color: 303030
-
 
 # legend
 legend.frameon: False
@@ -29,8 +28,8 @@ legend.numpoints: 1
 legend.scatterpoints: 1
 
 # xtick, ytick
-xtick.direction: out
-ytick.direction: out
+xtick.direction: in
+ytick.direction: in
 xtick.color: .15
 ytick.color: .15
 xtick.major.size: 0

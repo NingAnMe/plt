@@ -14,7 +14,7 @@ grid.linestyle: -.
 # axes
 axes.axisbelow: True
 axes.grid: True
-axes.facecolor: white
+axes.facecolor: EAEAF2
 axes.edgecolor: 303030
 axes.linewidth: 0.8
 axes.labelcolor: 303030
