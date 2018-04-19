@@ -559,7 +559,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         scatter_point = {"scatter_alpha": 0.8}
 
         dv_pub_3d.draw_regression(
-            ax1, x, y, regress_label, ax_annotate=regress_annotate,
+            ax1, x, y, label=regress_label, ax_annotate=regress_annotate,
             axislimit=regress_axislimit, locator=regress_locator,
             diagonal=regress_diagonal, regressline=regress_regressline,
             scatter_point=scatter_point,
@@ -733,7 +733,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         scatter_point = {"scatter_alpha": 0.8}
 
         dv_pub_3d.draw_regression(
-            ax1, x, y, regress_label, ax_annotate=regress_annotate,
+            ax1, x, y, label=regress_label, ax_annotate=regress_annotate,
             axislimit=regress_axislimit, locator=regress_locator,
             diagonal=regress_diagonal, regressline=regress_regressline,
             scatter_point=scatter_point,
@@ -796,7 +796,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             "size": 5, "marker": "o", "alpha": 1
         }
         dv_pub_3d.draw_regression(
-            ax1, x, y, density_label, ax_annotate=density_annotate,
+            ax1, x, y, label=density_label, ax_annotate=density_annotate,
             axislimit=density_axislimit, locator=density_locator,
             diagonal=density_diagonal, regressline=density_regressline,
             density=density,
@@ -890,8 +890,8 @@ if len(args) == 2:
 
     while date_s <= date_e:
         ymd = date_s.strftime('%Y%m%d')
-        # run(satPair, ymd, isMonthly)
-        pool.apply_async(run, (satPair, ymd, isMonthly))
+        run(satPair, ymd, isMonthly)
+        # pool.apply_async(run, (satPair, ymd, isMonthly))
         date_s = date_s + timeStep
 
     pool.close()
