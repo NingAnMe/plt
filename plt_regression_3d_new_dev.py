@@ -18,9 +18,9 @@ import numpy as np
 from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
 from DV import dv_pub_3d
-from DV.dv_pub_3d import FONT0, bias_information, day_data_write
+from DV.dv_pub_3d import FONT0, bias_information, day_data_write, draw_distribution
 from multiprocessing import Pool, Lock
-
+from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from datetime import datetime
@@ -480,12 +480,13 @@ def writeTxt(channel, part1, part2, o_name, ymd,
 
 def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
          xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax,
-         diagonal, isMonthly):
+         is_diagonal, isMonthly):
     plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
-    print 'right'
+    print 'right 1'
+
+    # 过滤 正负 delta+8倍std 的杂点 ------------------------
     w = 1.0 / weight if weight is not None else None
     RadCompare = G_reg1d(x, y, w)
-    # 过滤 正负 delta+8倍std 的杂点 ------------------------
     reg_line = x * RadCompare[0] + RadCompare[1]
     delta = np.abs(y - reg_line)
     mean_delta = np.mean(delta)
@@ -500,20 +501,9 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     # -----------------------------------------
     RadCompare = G_reg1d(x, y, w)
     length_rad = len(x)
-
-    if xname == "tbb":
-        ymin_distri = -4
-        ymax_distri = 4
-    elif xname == "ref":
-        ymin_distri = -0.08
-        ymax_distri = 0.08
-    else:
-        ymin_distri = ymin
-        ymax_distri = ymax
-
-    bias = None
     print 'right 2'
-    if not isMonthly and diagonal:
+    bias = None  # 当 bias 没有被计算的时候，不输出 bias
+    if not isMonthly and is_diagonal:
         # return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]
         fig = plt.figure(figsize=(14, 4.5))
         fig.subplots_adjust(top=0.92, bottom=0.11, left=0.045, right=0.985)
@@ -524,8 +514,18 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         titleName = '%s-%s' % (xname.upper(), yname.upper())
         title = '{} Regression {} Days {}_{} {} {}'.format(
             titleName, num_file, part1, part2, chan, ymd)
+
         # 画回归图 -----------------------------------------------
         print 'draw regression'
+        regress_xmin = xmin
+        regress_xmax = xmax
+        regress_ymin = ymin
+        regress_ymax = ymax
+        regress_axislimit = {
+            "xlimit": (regress_xmin, regress_xmax),
+            "ylimit": (regress_ymin, regress_ymax),
+        }
+
         if xunit != "":
             xlabel = '{} {} (${}$)'.format(part1, xname_l, xunit)
         else:
@@ -536,62 +536,149 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         else:
             ylabel = '{} {}'.format(part2, yname_l)
 
-        ax_annotate = {
+        regress_label = {
+            "xlabel": xlabel, "ylabel": ylabel,
+        }
+
+        if xname == "tbb":
+            regress_locator = {"locator_x": (5, 5), "locator_y": (5, 5)}
+        elif xname == "ref":
+            regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+
+        regress_annotate = {
                 "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
                          '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
                          '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-                         '{:15}: {:7d}'.format('Number', length_rad)]}
+                         '{:15}: {:7d}'.format('Number', length_rad)]
+        }
+
+        regress_diagonal = {"line_color": '#808080', "line_width": 1.2}
+
+        regress_regressline = {"line_color": 'r', "line_width": 1.2}
+
+        scatter_point = {"scatter_alpha": 0.8}
+
         dv_pub_3d.draw_regression(
-            ax1, x, y, x_label=xlabel, y_label=ylabel, ax_annotate=ax_annotate,
-            xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
-            is_diagonal=diagonal,
+            ax1, x, y, regress_label, ax_annotate=regress_annotate,
+            axislimit=regress_axislimit, locator=regress_locator,
+            diagonal=regress_diagonal, regressline=regress_regressline,
+            scatter_point=scatter_point,
         )
 
         # 画偏差分布图 ---------------------------------------------
         print 'draw distribution'
+
+        distri_xmin = xmin
+        distri_xmax = xmax
+        if xname == "tbb":
+            distri_ymin = -4
+            distri_ymax = 4
+        elif xname == "ref":
+            distri_ymin = -0.08
+            distri_ymax = 0.08
+        else:
+            distri_ymin = None
+            distri_ymax = None
+        distri_limit = {
+            "xlimit": (distri_xmin, distri_xmax),
+            "ylimit": (distri_ymin, distri_ymax),
+        }
+
         # x y 轴标签
         xlabel = "{}".format(xname_l)
         ylabel = "{} minus {} {} bias".format(part1, part2, xname)
+        distri_label = {
+            "xlabel": xlabel, "ylabel": ylabel,
+        }
 
         # 获取 MeanBias 信息
-        bias_info = bias_information(x, y, 0.1)
+        boundary = xmin + (xmax - xmin) * 0.15
+        bias_info = bias_information(x, y, boundary)
 
         # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
         bias = np.NaN  # RMD or TBB bias
         bias_info_md = ''
-        ab = polyfit(x, y, 1)
+        ab = RadCompare
         a = ab[0]
         b = ab[1]
         if xname == 'tbb':
-            bias = 250 * a + b - 250
+            bias = 250 - (250 * a + b)
             bias_info_md = "TBB Bias (250K) : {:.4f} K".format(bias)
         elif xname == 'ref':
-            bias = (0.25 * a + b) / 0.25 * 100
+            bias = (0.25 - (0.25 * a + b)) / 0.25 * 100
             bias_info_md = "Relative Bias (REF 0.25) : {:.4f} %".format(bias)
 
         # 添加注释信息
-        ax_annotate = {"left": [], "right": []}
-        ax_annotate.get("left").append(bias_info.get("info_lower"))
-        ax_annotate.get("left").append(bias_info.get("info_greater"))
-        ax_annotate.get("left").append(bias_info_md)
+        distri_annotate = {"left": [], "right": []}
+        distri_annotate.get("left").append(bias_info.get("info_lower"))
+        distri_annotate.get("left").append(bias_info.get("info_greater"))
+        distri_annotate.get("left").append(bias_info_md)
 
-        dv_pub_3d.draw_distribution(
-            ax2, x, y, x_label=xlabel, y_label=ylabel, ax_annotate=ax_annotate,
-            xmin=xmin, xmax=xmax, ymin=ymin_distri, ymax=ymax_distri,
-            is_diagonal=diagonal,
-        )
+        # 添加间隔数量
+        if xname == "tbb":
+            distri_locator = {"locator_x": (5, None), "locator_y": (8, 5)}
+        elif xname == 'ref':
+            distri_locator = {"locator_x": (None, None), "locator_y": (8, 5)}
+
+        # y=0 线配置
+        zeroline = {"line_color": '#808080', "line_width": 1.0}
+
+        # 偏差点配置
+        scatter_delta = {
+            "scatter_marker": 'o', "scatter_size": 5, "scatter_alpha": 0.8,
+            "scatter_linewidth": 0, "scatter_zorder": 100,
+            "scatter_color": BLUE,
+        }
+
+        # 偏差回归线配置
+        regressline = {"line_color": 'r', "line_width": 1.2}
+        print "ddddd1"
+        dv_pub_3d.draw_distribution(ax2, x, y, label=distri_label,
+                                    ax_annotate=distri_annotate,
+                                    axislimit=distri_limit,
+                                    locator=distri_locator,
+                                    zeroline=zeroline,
+                                    scatter_delta=scatter_delta,
+                                    regressline=regressline,
+                                    )
 
         # 画直方图 --------------------------------------------------
-        xlabel = "{}".format(xname_l)
-        ylabel = "match point numbers"
+        histogram_xmin = xmin
+        histogram_xmax = xmax
+        histogram_axislimit = {
+            "xlimit": (histogram_xmin, histogram_xmax),
+        }
+
+        histogram_xlabel = "{}".format(xname_l)
+        histogram_ylabel = "match point numbers"
+        histogram_label = {
+            "xlabel": histogram_xlabel, "ylabel": histogram_ylabel,
+        }
+
+        # 添加间隔数量
+        if xname == "tbb":
+            histogram_locator = {"locator_x": (5, None), "locator_y": (None, 5)}
+        elif xname == "ref":
+            histogram_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+
+        histogram_x = {
+            "label": part1, "color": "red", "alpha": 0.4, "bins": 100
+        }
+        histogram_y = {
+            "label": part2, "color": "blue", "alpha": 0.4, "bins": 100
+        }
+
         dv_pub_3d.draw_histogram(
-            ax3, x, y, x_label=xlabel, y_label=ylabel,
-            hist_label_x=part1, hist_label_y=part2,
-            xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
-            is_diagonal=diagonal,
+            ax3, x, label=histogram_label, locator=histogram_locator,
+            axislimit=histogram_axislimit, histogram=histogram_x,
+        )
+
+        dv_pub_3d.draw_histogram(
+            ax3, y, label=histogram_label, locator=histogram_locator,
+            axislimit=histogram_axislimit, histogram=histogram_y,
         )
         print 'right 4'
-    elif not isMonthly and not diagonal:
+    elif not isMonthly and not is_diagonal:
         fig = plt.figure(figsize=(4.5, 4.5))
         fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
         ax1 = plt.subplot2grid((1, 1), (0, 0))
@@ -599,6 +686,17 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         titleName = '%s-%s' % (xname.upper(), yname.upper())
         title = '{} Regression {} Days\n{}_{} {} {}'.format(
             titleName, num_file, part1, part2, chan, ymd)
+        # 画回归图 ----------------------------------------------------
+        print 'draw regression'
+        regress_xmin = xmin
+        regress_xmax = xmax
+        regress_ymin = ymin
+        regress_ymax = ymax
+        regress_axislimit = {
+            "xlimit": (regress_xmin, regress_xmax),
+            "ylimit": (regress_ymin, regress_ymax),
+        }
+
         if xunit != "":
             xlabel = '{} {} (${}$)'.format(part1, xname_l, xunit)
         else:
@@ -608,18 +706,39 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             ylabel = '{} {} (${}$)'.format(part2, yname_l, yunit)
         else:
             ylabel = '{} {}'.format(part2, yname_l)
-        # 画回归图 ----------------------------------------------------
+
+        regress_label = {
+            "xlabel": xlabel, "ylabel": ylabel,
+        }
+
+        if xname == "tbb":
+            regress_locator = {"locator_x": (5, None), "locator_y": (5, 5)}
+        elif xname == "ref":
+            regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+        elif xname == "dn":
+            regress_locator = {"locator_x": (5, None),
+                               "locator_y": (None, 5)}
+
+        regress_annotate = {
+            "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+                     '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+                     '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+                     '{:15}: {:7d}'.format('Number', length_rad)]
+        }
+
+        regress_diagonal = {"line_color": '#808080', "line_width": 1.2}
+
+        regress_regressline = {"line_color": 'r', "line_width": 1.2}
+
+        scatter_point = {"scatter_alpha": 0.8}
+
         dv_pub_3d.draw_regression(
-            ax1, x, y, x_label=xlabel, y_label=ylabel,
-            ax_annotate={
-                "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
-                         '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
-                         '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-                         '{:15}: {:7d}'.format('Number', length_rad)]},
-            xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
-            is_diagonal=diagonal,
+            ax1, x, y, regress_label, ax_annotate=regress_annotate,
+            axislimit=regress_axislimit, locator=regress_locator,
+            diagonal=regress_diagonal, regressline=regress_regressline,
+            scatter_point=scatter_point,
         )
-    if isMonthly:
+    elif isMonthly:
         o_file = o_file + "_density"
 
         fig = plt.figure(figsize=(4.5, 4.5))
@@ -629,6 +748,17 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         titleName = '%s-%s' % (xname.upper(), yname.upper())
         title = '{} Regression {} Days\n{}_{} {} {}'.format(
             titleName, num_file, part1, part2, chan, ymd)
+        # 画密度图 -----------------------------------------------------
+        print 'draw density'
+        density_xmin = xmin
+        density_xmax = xmax
+        density_ymin = ymin
+        density_ymax = ymax
+        density_axislimit = {
+            "xlimit": (density_xmin, density_xmax),
+            "ylimit": (density_ymin, density_ymax),
+        }
+
         if xunit != "":
             xlabel = '{} {} (${}$)'.format(part1, xname_l, xunit)
         else:
@@ -638,17 +768,43 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             ylabel = '{} {} (${}$)'.format(part2, yname_l, yunit)
         else:
             ylabel = '{} {}'.format(part2, yname_l)
-        # 画密度图 -----------------------------------------------------
-        dv_pub_3d.draw_density(
-            ax1, x, y, x_label=xlabel, y_label=ylabel,
-            ax_annotate={
-                "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
-                         '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
-                         '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-                         '{:15}: {:7d}'.format('Number', length_rad)]},
-            xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
-            is_diagonal=diagonal,
+
+        density_label = {
+            "xlabel": xlabel, "ylabel": ylabel,
+        }
+
+        if xname == "tbb":
+            density_locator = {"locator_x": (5, None), "locator_y": (5, 5)}
+        elif xname == "ref":
+            density_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+        if xname == "dn":
+            density_locator = {"locator_x": (5, None),
+                               "locator_y": (None, 5)}
+
+        density_annotate = {
+            "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+                     '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+                     '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+                     '{:15}: {:7d}'.format('Number', length_rad)]
+        }
+
+        density_diagonal = {"line_color": '#808080', "line_width": 1.2}
+
+        density_regressline = {"line_color": 'r', "line_width": 1.2}
+
+        density = {
+            "size": 5, "marker": "o", "alpha": 1
+        }
+        dv_pub_3d.draw_regression(
+            ax1, x, y, density_label, ax_annotate=density_annotate,
+            axislimit=density_axislimit, locator=density_locator,
+            diagonal=density_diagonal, regressline=density_regressline,
+            density=density,
         )
+    else:
+        print 'No output Pic {} : '.format(ymd)
+        return
+
     print 'right 3'
     fig.suptitle(title, fontsize=11, fontproperties=FONT0)
     pb_io.make_sure_path_exists(os.path.dirname(o_file))
@@ -734,7 +890,8 @@ if len(args) == 2:
 
     while date_s <= date_e:
         ymd = date_s.strftime('%Y%m%d')
-        pool.apply_async(run, (satPair, ymd, isMonthly))
+        run(satPair, ymd, isMonthly)
+        # pool.apply_async(run, (satPair, ymd, isMonthly))
         date_s = date_s + timeStep
 
     pool.close()

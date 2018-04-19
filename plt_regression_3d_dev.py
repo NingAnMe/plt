@@ -540,7 +540,10 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             "xlabel": xlabel, "ylabel": ylabel,
         }
 
-        regress_locator = {"locator_x": (5, 5), "locator_y": (5, 5)}
+        if xname == "tbb":
+            regress_locator = {"locator_x": (5, 5), "locator_y": (5, 5)}
+        elif xname == "ref":
+            regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
 
         regress_annotate = {
                 "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
@@ -612,7 +615,10 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         distri_annotate.get("left").append(bias_info_md)
 
         # 添加间隔数量
-        distri_locator = {"locator_x": (5, 5), "locator_y": (8, 5)}
+        if xname == "tbb":
+            distri_locator = {"locator_x": (5, None), "locator_y": (8, 5)}
+        elif xname == 'ref':
+            distri_locator = {"locator_x": (None, None), "locator_y": (8, 5)}
 
         # y=0 线配置
         zeroline = {"line_color": '#808080', "line_width": 1.0}
@@ -650,7 +656,10 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         }
 
         # 添加间隔数量
-        histogram_locator = {"locator_x": (5, 5), "locator_y": (None, 5)}
+        if xname == "tbb":
+            histogram_locator = {"locator_x": (5, None), "locator_y": (None, 5)}
+        elif xname == "ref":
+            histogram_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
 
         histogram_x = {
             "label": part1, "color": "red", "alpha": 0.4, "bins": 100
@@ -702,7 +711,13 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             "xlabel": xlabel, "ylabel": ylabel,
         }
 
-        regress_locator = {"locator_x": (5, 5), "locator_y": (5, 5)}
+        if xname == "tbb":
+            regress_locator = {"locator_x": (5, None), "locator_y": (5, 5)}
+        elif xname == "ref":
+            regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+        elif xname == "dn":
+            regress_locator = {"locator_x": (5, None),
+                               "locator_y": (None, 5)}
 
         regress_annotate = {
             "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
@@ -734,6 +749,16 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         title = '{} Regression {} Days\n{}_{} {} {}'.format(
             titleName, num_file, part1, part2, chan, ymd)
         # 画密度图 -----------------------------------------------------
+        print 'draw density'
+        density_xmin = xmin
+        density_xmax = xmax
+        density_ymin = ymin
+        density_ymax = ymax
+        density_axislimit = {
+            "xlimit": (density_xmin, density_xmax),
+            "ylimit": (density_ymin, density_ymax),
+        }
+
         if xunit != "":
             xlabel = '{} {} (${}$)'.format(part1, xname_l, xunit)
         else:
@@ -744,21 +769,38 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         else:
             ylabel = '{} {}'.format(part2, yname_l)
 
-        density_xmin = xmin
-        density_xmax = xmax
-        density_ymin = ymin
-        density_ymax = ymax
-        density_axislimit = {
-            "xlimit": (density_xmin, density_xmax),
-            "ylimit": (density_ymin, density_ymax),
-        }
         density_label = {
             "xlabel": xlabel, "ylabel": ylabel,
         }
-        # dv_pub_3d.draw_density(
-        #     ax1, x, y, label=density_label,
-        #     axislimit=density_axislimit,
-        # )
+
+        if xname == "tbb":
+            density_locator = {"locator_x": (5, None), "locator_y": (5, 5)}
+        elif xname == "ref":
+            density_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+        if xname == "dn":
+            density_locator = {"locator_x": (5, None),
+                               "locator_y": (None, 5)}
+
+        density_annotate = {
+            "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+                     '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+                     '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+                     '{:15}: {:7d}'.format('Number', length_rad)]
+        }
+
+        density_diagonal = {"line_color": '#808080', "line_width": 1.2}
+
+        density_regressline = {"line_color": 'r', "line_width": 1.2}
+
+        density = {
+            "size": 5, "marker": "o", "alpha": 1
+        }
+        dv_pub_3d.draw_regression(
+            ax1, x, y, density_label, ax_annotate=density_annotate,
+            axislimit=density_axislimit, locator=density_locator,
+            diagonal=density_diagonal, regressline=density_regressline,
+            density=density,
+        )
     else:
         print 'No output Pic {} : '.format(ymd)
         return
