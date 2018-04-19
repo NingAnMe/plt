@@ -84,39 +84,39 @@ def draw_RSD_Bar(filename, x, deviationValue, titledict, tl_list, tr_list, ab=No
     return
 
 
-def get_bar_data(x, y):
-    '''
-    计算errorbar的位置和bar的高度
-    '''
-    divide = 15
-    minValue = np.min(x)
-    maxValue = np.max(x)
-    step = (maxValue - minValue) / (divide * 1.0)
-    xList = []  # errorbar x
-    meanList = []  # errorbar y
-    stdList = []  # errorbar height
-
-    for i in xrange(divide):
-        if i < (divide - 1):
-            lines = np.where(np.logical_and(x >= (minValue + step * i), x < (minValue + step * (i + 1))))[0]
-        else:
-            lines = np.where(np.logical_and(x >= (minValue + step * i), x <= (minValue + step * (i + 1))))[0]
-        if len(lines) > 0:
-            dvalues = y[lines]
-        else:
-            continue
-
-        dv_mean = np.mean(dvalues)
-        dv_std = np.std(dvalues)
-        lines2 = np.where(np.abs(dvalues - dv_mean) < dv_std)[0]  # <1倍std
-        if len(lines2) > 0:
-            t = minValue + step * i + step * 0.5
-            dvalues2 = dvalues[lines2]
-            meanList.append(np.mean(dvalues2))
-            stdList.append(np.std(dvalues2))
-            xList.append(t)
-
-    return xList, meanList, stdList
+# def get_bar_data(x, y):
+#     '''
+#     计算errorbar的位置和bar的高度
+#     '''
+#     divide = 15
+#     minValue = np.min(x)
+#     maxValue = np.max(x)
+#     step = (maxValue - minValue) / (divide * 1.0)
+#     xList = []  # errorbar x
+#     meanList = []  # errorbar y
+#     stdList = []  # errorbar height
+#
+#     for i in xrange(divide):
+#         if i < (divide - 1):
+#             lines = np.where(np.logical_and(x >= (minValue + step * i), x < (minValue + step * (i + 1))))[0]
+#         else:
+#             lines = np.where(np.logical_and(x >= (minValue + step * i), x <= (minValue + step * (i + 1))))[0]
+#         if len(lines) > 0:
+#             dvalues = y[lines]
+#         else:
+#             continue
+#
+#         dv_mean = np.mean(dvalues)
+#         dv_std = np.std(dvalues)
+#         lines2 = np.where(np.abs(dvalues - dv_mean) < dv_std)[0]  # <1倍std
+#         if len(lines2) > 0:
+#             t = minValue + step * i + step * 0.5
+#             dvalues2 = dvalues[lines2]
+#             meanList.append(np.mean(dvalues2))
+#             stdList.append(np.std(dvalues2))
+#             xList.append(t)
+#
+#     return xList, meanList, stdList
 
 
 def set_tick_font(ax, scale_size=SCALE_SIZE):
@@ -291,7 +291,7 @@ def get_bar_data(xx, delta, Tmin, Tmax, step):
     std_seg = []
     sampleNums = []
     for i in np.arange(Tmin, Tmax, step):
-        idx = np.where(np.logical_and(xx >= i , xx < (i + step)))[0]
+        idx = np.where(np.logical_and(xx >= i, xx < (i + step)))[0]
 
         if idx.size > 0:
             DTb_block = delta[idx]
@@ -377,9 +377,10 @@ def draw_Scatter(x, y, filename, titledict, tl_list, tr_list,
     plt.close()
 
 
-def draw_regression(ax, x, y, x_label=None, y_label=None, ax_annotate={},
-                    xmin=None, xmax=None, ymin=None, ymax=None, gab_number=5,
-                    is_diagonal=False):
+def draw_regression(ax, x, y, label=None, ax_annotate=None,
+                    axislimit=None, locator=None,
+                    diagonal=None, regressline=None, scatter_point=None,
+                    density=None,):
     """
     画回归线图
     :param ax:
@@ -396,70 +397,129 @@ def draw_regression(ax, x, y, x_label=None, y_label=None, ax_annotate={},
     :param is_diagonal: 是否画对角线
     :return:
     """
-    if None in [xmin, xmax, ymin, ymax]:
+    if axislimit is not None:
+        xlimit = axislimit.get("xlimit")
+        ylimit = axislimit.get("ylimit")
+        if xlimit is not None:
+            xmin, xmax = xlimit
+        else:
+            xmin = floor(np.min(x))
+            xmax = ceil(np.max(x))
+        if ylimit is not None:
+            ymin, ymax = ylimit
+        else:
+            ymin = floor(np.min(y))
+            ymax = ceil(np.max(y))
+    else:
         xmin = floor(np.min(x))
         xmax = ceil(np.max(x))
         ymin = floor(np.min(y))
         ymax = ceil(np.max(y))
 
+    # 画对角线
+    if diagonal is not None:
+        diagonal_color = '#808080'
+        diagonal_linewith = 1.2
+        ax.plot([xmin, xmax], [ymin, ymax], color=diagonal_color,
+                linewidth=diagonal_linewith)
+
+    # 画回归线
+    if regressline is not None:
+        line_color = regressline.get("line_color")
+        line_width = regressline.get("line_width")
+        # 计算 a b
+        ab = np.polyfit(x, y, 1)
+        a = ab[0]
+        b = ab[1]
+        ax.plot([xmin, xmax], [xmin * a + b, xmax * a + b],
+                color=line_color, linewidth=line_width, zorder=100)
+
+    # 画散点
+    if scatter_point is not None:
+        alpha_value = 0.8  # 透明度
+        marker_value = 'o'  # 形状
+        color_value = 'b'  # 颜色
+        ax.scatter(x, y, s=5, marker=marker_value, c=color_value, lw=0, alpha=alpha_value)
+
+    # 画密度点
+    if density is not None:
+        pos = np.vstack([x, y])
+        kernel = stats.gaussian_kde(pos)
+        z = kernel(pos)
+        norm = plt.Normalize()
+        norm.autoscale(z)
+        density_size = density.get("size")
+        density_alpha = density.get("alpha")
+        density_marker = density.get("marker")
+        ax.scatter(x, y, c=z, norm=norm, s=density_size, marker=density_marker,
+                   cmap=plt.cm.jet, lw=0,
+                   alpha=density_alpha)
+
     # 设定x y 轴的范围
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
 
-    # 计算 a b
-    ab = np.polyfit(x, y, 1)
-    a = ab[0]
-    b = ab[1]
-
-    # 画对角线
-    diagonal_color = '#808080'
-    diagonal_lw = 1.2
-    if is_diagonal:
-        ax.plot([xmin, xmax], [ymin, ymax], color=diagonal_color,
-                linewidth=diagonal_lw)
-
-    # 画回归线
-    ax.plot([xmin, xmax], [xmin * a + b, xmax * a + b],
-            color='r', linewidth=1.2, zorder=100)
-
-    # 画散点
-    alpha_value = 0.8  # 透明度
-    marker_value = 'o'  # 形状
-    color_value = 'b'  # 颜色
-    ax.scatter(x, y, s=5, marker=marker_value, c=color_value, lw=0, alpha=alpha_value)
-
     # 设定小刻度
-    xticklocs = ax.xaxis.get_ticklocs()
-    yticklocs = ax.yaxis.get_ticklocs()
-    ax.xaxis.set_minor_locator(MultipleLocator((xticklocs[1] - xticklocs[0]) / gab_number))
-    ax.yaxis.set_minor_locator(MultipleLocator((yticklocs[1] - yticklocs[0]) / gab_number))
+    if locator is not None:
+        major_locator_x = locator.get("locator_x")[0]
+        minor_locator_x = locator.get("locator_x")[1]
+        major_locator_y = locator.get("locator_y")[0]
+        minor_locator_y = locator.get("locator_y")[1]
 
-    # 注释，格式['annotate1', 'annotate2']
-    add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
-    add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
-    add_xylabel(ax, x_label, y_label)
+        major_x = (xmin, xmax)
+        major_y = (ymin, ymax)
+        xticklocs = ax.xaxis.get_ticklocs()
+        yticklocs = ax.yaxis.get_ticklocs()
+        if major_locator_x is not None:
+            ax.xaxis.set_major_locator(
+                MultipleLocator(
+                    (major_x[1] - major_x[0]) / major_locator_x))
+        if minor_locator_x is not None:
+            ax.xaxis.set_minor_locator(
+                MultipleLocator(
+                    (xticklocs[1] - xticklocs[0]) / minor_locator_x))
+        if major_locator_y is not None:
+            ax.yaxis.set_major_locator(
+                MultipleLocator(
+                    (major_y[1] - major_y[0]) / major_locator_y))
+        if minor_locator_y is not None:
+            ax.yaxis.set_minor_locator(
+                MultipleLocator(
+                    (yticklocs[1] - yticklocs[0]) / minor_locator_y))
+
+    # 注释，格式 ['annotate1', 'annotate2']
+    if ax_annotate is not None:
+        font_size = 10
+        add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
+        add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
+
+    # 标签
+    if label is not None:
+        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+
+    # 设置 tick 字体
     set_tick_font(ax)
 
 
-def bias_information(x, y, percent=0.1):
+def bias_information(x, y, boundary=0.1):
     """
     # 过滤 range%10 范围的值，计算偏差信息
     # MeanBias( <= 10 % Range) = MD±Std @ MT
     # MeanBias( > 10 % Range) = MD±Std @ MT
     :param x:
     :param y:
-    :param percent:
+    :param boundary:
     :return: MD Std MT 偏差均值 偏差 std 样本均值
     """
     # 计算偏差
     delta = x - y
 
-    range_percent = (delta.min() + (delta.max() - delta.min())) * percent
-    idx_greater = np.where(delta > range_percent)
+    idx_greater = np.where(x > boundary)
     delta_greater = delta[idx_greater]
     x_greater = x[idx_greater]
 
-    idx_lower = np.where(delta <= range_percent)
+    idx_lower = np.where(x <= boundary)
     delta_lower = delta[idx_lower]
     x_lower = x[idx_lower]
 
@@ -486,29 +546,31 @@ def bias_information(x, y, percent=0.1):
 
 
 def draw_distribution(ax, x, y, label=None, ax_annotate=None,
-                      xmin=None, xmax=None, ymin=None, ymax=None, gab_number=8.0,
+                      axislimit=None, locator=None,
                       avxline=None, zeroline=None, scatter_delta=None,
                       scatter_fill=None, regressline=None,):
     """
     画偏差分布图
     :return:
     """
-    if None in [xmin, xmax]:
+    if axislimit is not None:
+        xlimit = axislimit.get("xlimit")
+        ylimit = axislimit.get("ylimit")
+        if xlimit is not None:
+            xmin, xmax = xlimit
+        else:
+            xmin = floor(np.min(x))
+            xmax = ceil(np.max(x))
+        if ylimit is not None:
+            ymin, ymax = ylimit
+        else:
+            ymin = floor(np.min(y))
+            ymax = ceil(np.max(y))
+    else:
         xmin = floor(np.min(x))
         xmax = ceil(np.max(x))
-    if None in [ymin, ymax]:
         ymin = floor(np.min(y))
         ymax = ceil(np.max(y))
-
-    # 设置 x y 坐标轴范围
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-
-    # 设置 x y 轴的刻度
-    ax.xaxis.set_major_locator(MultipleLocator((xmax - xmin) / gab_number))
-    ax.xaxis.set_minor_locator(MultipleLocator((xmax - xmin) / gab_number / 2))
-    ax.yaxis.set_major_locator(MultipleLocator((ymax - ymin) / gab_number))
-    ax.yaxis.set_minor_locator(MultipleLocator((ymax - ymin) / gab_number / 2))
 
     # 添加 y = 0 的线
     if zeroline is not None:
@@ -568,6 +630,38 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
                     va="top", ha="center", color=avxline_wordcolor,
                     size=avxline_wordsize, fontproperties=FONT_MONO)
 
+    # 设定x y 轴的范围
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    # 设定小刻度
+    if locator is not None:
+        major_locator_x = locator.get("locator_x")[0]
+        minor_locator_x = locator.get("locator_x")[1]
+        major_locator_y = locator.get("locator_y")[0]
+        minor_locator_y = locator.get("locator_y")[1]
+
+        major_x = (xmin, xmax)
+        major_y = (ymin, ymax)
+        xticklocs = ax.xaxis.get_ticklocs()
+        yticklocs = ax.yaxis.get_ticklocs()
+        if major_locator_x is not None:
+            ax.xaxis.set_major_locator(
+                MultipleLocator(
+                    (major_x[1] - major_x[0]) / major_locator_x))
+        if minor_locator_x is not None:
+            ax.xaxis.set_minor_locator(
+                MultipleLocator(
+                    (xticklocs[1] - xticklocs[0]) / minor_locator_x))
+        if major_locator_y is not None:
+            ax.yaxis.set_major_locator(
+                MultipleLocator(
+                    (major_y[1] - major_y[0]) / major_locator_y))
+        if minor_locator_y is not None:
+            ax.yaxis.set_minor_locator(
+                MultipleLocator(
+                    (yticklocs[1] - yticklocs[0]) / minor_locator_y))
+
     # 注释，格式 ['annotate1', 'annotate2']
     if ax_annotate is not None:
         font_size = 10
@@ -583,10 +677,9 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
     set_tick_font(ax)
 
 
-def draw_histogram(ax, x, y=None, x_label=None, y_label=None, ax_annotate={},
-                   hist_label_x='X', hist_label_y='Y',
-                   xmin=None, xmax=None, ymin=None, ymax=None, gab_number=8.0,
-                   is_diagonal=False):
+def draw_histogram(ax, x, label=None, ax_annotate=None,
+                   axislimit=None, locator=None,
+                   histogram=None,):
     """
     画直方图
     :param hist_label_y:
@@ -605,65 +698,137 @@ def draw_histogram(ax, x, y=None, x_label=None, y_label=None, ax_annotate={},
     :param is_diagonal:
     :return:
     """
-    if ax_annotate is None:
-        ax_annotate = {}
-    if None in [xmin, xmax,]:
+    if axislimit is not None:
+        xlimit = axislimit.get("xlimit")
+        # ylimit = axislimit.get("ylimit")
+        if xlimit is not None:
+            xmin, xmax = xlimit
+        else:
+            xmin = floor(np.min(x))
+            xmax = ceil(np.max(x))
+        # if ylimit is not None:
+        #     ymin, ymax = ylimit
+        # else:
+        #     ymin = floor(np.min(y))
+        #     ymax = ceil(np.max(y))
+    else:
         xmin = floor(np.min(x))
         xmax = ceil(np.max(x))
+        # ymin = floor(np.min(y))
+        # ymax = ceil(np.max(y))
 
-    alpha = 0.4
-    color_x = "red"
-    hist_label_x = hist_label_x
-    ax.hist(x, 100, range=(xmin, xmax), histtype='bar', color=color_x,
-            label=hist_label_x, alpha=alpha)
+    if histogram is not None:
+        hist_alpha = histogram.get("alpha")
+        hist_color = histogram.get("color")
+        hist_label = histogram.get("label")
+        hist_bins = histogram.get("bins")
 
-    if y is not None:
-        color_y = "blue"
-        hist_label_y = hist_label_y
-        ax.hist(y, 100, range=(xmin, xmax), histtype='bar', color=color_y,
-                label=hist_label_y, alpha=alpha)
+        ax.hist(x, hist_bins, range=(xmin, xmax), histtype='bar', color=hist_color,
+                label=hist_label, alpha=hist_alpha)
+        ax.legend(prop={'size': 10})
 
-    # 设置标签
-    ax.legend(prop={'size': 10})
-    # 注释，格式['annotate1', 'annotate2']
-    add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
-    add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
-    add_xylabel(ax, x_label, y_label)
+    # 设定x y 轴的范围
+    ax.set_xlim(xmin, xmax)
+    # ax.set_ylim(ymin, ymax)
+
+    # 设定小刻度
+    if locator is not None:
+        major_locator_x = locator.get("locator_x")[0]
+        minor_locator_x = locator.get("locator_x")[1]
+        major_locator_y = locator.get("locator_y")[0]
+        minor_locator_y = locator.get("locator_y")[1]
+
+        major_x = (xmin, xmax)
+        # major_y = (ymin, ymax)
+        xticklocs = ax.xaxis.get_ticklocs()
+        yticklocs = ax.yaxis.get_ticklocs()
+
+        if major_locator_x is not None:
+            ax.xaxis.set_major_locator(
+                MultipleLocator(
+                    (major_x[1] - major_x[0]) / major_locator_x))
+        if minor_locator_x is not None:
+            ax.xaxis.set_minor_locator(
+                MultipleLocator(
+                    (xticklocs[1] - xticklocs[0]) / minor_locator_x))
+        # if major_locator_y is not None:
+        #     ax.yaxis.set_major_locator(
+        #         MultipleLocator((major_y[1] - major_y[0]) / major_locator_y))
+        if minor_locator_y is not None:
+            ax.yaxis.set_minor_locator(
+                MultipleLocator(
+                    (yticklocs[1] - yticklocs[0]) / minor_locator_y))
+
+    # 注释，格式 ['annotate1', 'annotate2']
+    if ax_annotate is not None:
+        font_size = 10
+        add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
+        add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
+
+    # 标签
+    if label is not None:
+        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+
+    # 设置 tick 字体
     set_tick_font(ax)
 
 
 def draw_bar(ax, x, y, label=None, ax_annotate=None,
-             xmin=None, xmax=None, ymin=None, ymax=None, gab_y=7, gab_x=5.0,
-             bar=None,):
+             axislimit=None, locator=None,
+             bar=None
+             ):
     """
     """
-    print xmin, xmax
-    if None in [xmin, xmax]:
+    if axislimit is not None:
+        xlimit = axislimit.get("xlimit")
+        ylimit = axislimit.get("ylimit")
+        if xlimit is not None:
+            xmin, xmax = xlimit
+        else:
+            xmin = floor(np.min(x))
+            xmax = ceil(np.max(x))
+        if ylimit is not None:
+            ymin, ymax = ylimit
+        else:
+            ymin = floor(np.min(y))
+            ymax = ceil(np.max(y))
+    else:
         xmin = floor(np.min(x))
         xmax = ceil(np.max(x))
-    if None in [ymin, ymax]:
         ymin = floor(np.min(y))
         ymax = ceil(np.max(y))
 
-    # 设置 x y 坐标轴范围
+    # 设定x y 轴的范围
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
 
-    # 设置 x y 轴的刻度
-    major_x = (xmax - xmin) / gab_x
-    minor_x = major_x / 2.0
-    major_y = (ymax - ymin) / gab_y
-    minor_y = major_y / 2.0
-    if isinstance(major_x, float):
-        major_x = float('%.5f' % major_x)
-        minor_x = float('%.5f' % minor_x)
-    if isinstance(major_y, float):
-        major_y = float('%.5f' % major_y)
-        minor_y = float('%.5f' % minor_y)
-    # ax.xaxis.set_major_locator(MultipleLocator(major_x))
-    # ax.xaxis.set_minor_locator(MultipleLocator(minor_x))
-    ax.yaxis.set_major_locator(MultipleLocator(major_y))
-    ax.yaxis.set_minor_locator(MultipleLocator(minor_y))
+    # 设定小刻度
+    # 设定小刻度
+    if locator is not None:
+        major_locator_x = locator.get("locator_x")[0]
+        minor_locator_x = locator.get("locator_x")[1]
+        major_locator_y = locator.get("locator_y")[0]
+        minor_locator_y = locator.get("locator_y")[1]
+
+        major_x = (xmin, xmax)
+        major_y = (ymin, ymax)
+        xticklocs = ax.xaxis.get_ticklocs()
+        yticklocs = ax.yaxis.get_ticklocs()
+        if major_locator_x is not None:
+            ax.xaxis.set_major_locator(
+                MultipleLocator((major_x[1] - major_x[0]) / major_locator_x))
+        if minor_locator_x is not None:
+            ax.xaxis.set_minor_locator(
+                MultipleLocator(
+                    (xticklocs[1] - xticklocs[0]) / minor_locator_x))
+        if major_locator_y is not None:
+            ax.yaxis.set_major_locator(
+                MultipleLocator((major_y[1] - major_y[0]) / major_locator_y))
+        if minor_locator_y is not None:
+            ax.yaxis.set_minor_locator(
+                MultipleLocator(
+                    (yticklocs[1] - yticklocs[0]) / minor_locator_y))
 
     if bar is not None:
         delta = x - y
@@ -883,62 +1048,6 @@ def draw_Scatter_withColorbar(x, y, filename, titledict, tl_list, tr_list):
     fig.clear()
     plt.close()
     return
-
-
-def draw_density(ax, x, y, x_label=None, y_label=None, ax_annotate={},
-                 xmin=None, xmax=None, ymin=None, ymax=None, gab_number=5,
-                 is_diagonal=False):
-    """
-    绘制密度图
-    :return:
-    """
-    if None in [xmin, xmax, ymin, ymax]:
-        xmin = floor(np.min(x))
-        xmax = ceil(np.max(x))
-        ymin = floor(np.min(y))
-        ymax = ceil(np.max(y))
-
-    # 设定x y 轴的范围
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-
-    # 计算 a b
-    ab = np.polyfit(x, y, 1)
-    a = ab[0]
-    b = ab[1]
-
-    # 画对角线
-    diagonal_color = '#808080'
-    diagonal_lw = 1.2
-    if is_diagonal:
-        ax.plot([xmin, xmax], [ymin, ymax], color=diagonal_color,
-                linewidth=diagonal_lw)
-
-    # 画回归线
-    ax.plot([xmin, xmax], [xmin * a + b, xmax * a + b],
-            color='r', linewidth=1.2, zorder=100)
-
-    # 画密度点
-    pos = np.vstack([x, y])
-    kernel = stats.gaussian_kde(pos)
-    z = kernel(pos)
-    norm = plt.Normalize()
-    norm.autoscale(z)
-    ax.scatter(x, y, c=z, norm=norm, s=5, marker="o", cmap=plt.cm.jet, lw=0, alpha=1)
-
-    # 设定小刻度
-    xticklocs = ax.xaxis.get_ticklocs()
-    yticklocs = ax.yaxis.get_ticklocs()
-    ax.xaxis.set_minor_locator(
-        MultipleLocator((xticklocs[1] - xticklocs[0]) / gab_number))
-    ax.yaxis.set_minor_locator(
-        MultipleLocator((yticklocs[1] - yticklocs[0]) / gab_number))
-
-    # 注释，格式['annotate1', 'annotate2']
-    add_annotate(ax, ax_annotate.get("left"), "left", fontsize=10)
-    add_annotate(ax, ax_annotate.get("right"), "right", fontsize=10)
-    add_xylabel(ax, x_label, y_label)
-    set_tick_font(ax)
 
 
 def add_colorbar_right_vertical(fig, colorMin, colorMax,
