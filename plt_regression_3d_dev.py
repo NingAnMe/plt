@@ -17,9 +17,10 @@ import numpy as np
 
 from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
-from DV import dv_pub_legacy
+from DV import dv_pub_3d
+from DV.dv_pub_3d import FONT0, bias_information, day_data_write, draw_distribution
 from multiprocessing import Pool, Lock
-
+from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from datetime import datetime
@@ -29,10 +30,10 @@ lock = Lock()
 
 
 def run(pair, ymd, isMonthly):
-    '''
+    """
     pair: sat1+sensor1_sat2+sensor2
     ymd: str YYYYMMDD
-    '''
+    """
     part1, part2 = pair.split('_')
     sat1, sensor1 = part1.split('+')
     sat2, sensor2 = part2.split('+')
@@ -56,6 +57,9 @@ def run(pair, ymd, isMonthly):
         dict_cabr = {}
         dict_cabr_d = {}
         dict_cabr_n = {}
+        dict_md = {}
+        dict_md_d = {}
+        dict_md_n = {}
 
         # 需要回滚的天数
         if isMonthly:
@@ -73,8 +77,6 @@ def run(pair, ymd, isMonthly):
                     Day_Night.remove(t)
 
         for idx, chan in enumerate(plt_cfg[each]['chan']):
-            if chan != 'CH_24':
-                continue
             Log.info(u"Start Drawing {} Channel {}".format(each, chan))
             oneHDF5 = ReadHDF5()
             num_file = PERIOD
@@ -189,26 +191,32 @@ def run(pair, ymd, isMonthly):
 
             if 'all' in Day_Night and o_name not in dict_cabr:
                 dict_cabr[o_name] = {}
+                dict_md[xname] = {}
             if 'day' in Day_Night and o_name not in dict_cabr_d:
                 dict_cabr_d[o_name] = {}
+                dict_md_d[xname] = {}
             if 'night' in Day_Night and o_name not in dict_cabr_n:
                 dict_cabr_n[o_name] = {}
+                dict_md_n[xname] = {}
 
             if x.size < 10:
                 Log.error("Not enough match point to draw.")
                 if 'all' in Day_Night:
                     dict_cabr[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                    dict_md[xname][chan] = np.NaN
                 if 'day' in Day_Night:
                     dict_cabr_d[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                    dict_md_d[xname][chan] = np.NaN
                 if 'night' in Day_Night:
                     dict_cabr_n[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                    dict_md_n[xname][chan] = np.NaN
                 continue
             print('2')
             # regression starts
             if 'all' in Day_Night:
                 o_file = os.path.join(cur_path,
                                       '%s_%s_%s_ALL_%s' % (pair, o_name, chan, str_time))
-                abr = plot(x, y, weight, o_file,
+                abr, bias = plot(x, y, weight, o_file,
                            num_file, part1, part2, chan, str_time,
                            xname, xname_l, xunit, xmin, xmax,
                            yname, yname_l, yunit, ymin, ymax,
@@ -217,6 +225,10 @@ def run(pair, ymd, isMonthly):
                     dict_cabr[o_name][chan] = abr
                 else:
                     dict_cabr[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                if bias:
+                    dict_md[xname][chan] = bias
+                else:
+                    dict_md[xname][chan] = np.NaN
             print('4')
             print(each, chan)
             # ------- day ----------
@@ -234,7 +246,7 @@ def run(pair, ymd, isMonthly):
                     w_d = weight[day_index] if weight is not None else None
                     print('9')
                     print('x, y, day_index', len(x_d), len(y_d), len(day_index))
-                    abr = plot(x_d, y_d, w_d, o_file,
+                    abr, bias = plot(x_d, y_d, w_d, o_file,
                                num_file, part1, part2, chan, str_time,
                                xname, xname_l, xunit, xmin, xmax,
                                yname, yname_l, yunit, ymin, ymax,
@@ -243,9 +255,14 @@ def run(pair, ymd, isMonthly):
                     if abr:
                         dict_cabr_d[o_name][chan] = abr
                     else:
-                        dict_cabr_n[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                        dict_cabr_d[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                    if bias:
+                        dict_md_d[xname][chan] = bias
+                    else:
+                        dict_md_d[xname][chan] = np.NaN
                 else:
                     dict_cabr_d[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                    dict_md_d[xname][chan] = np.NaN
             print('5')
             # ---------night ------------
             if 'night' in Day_Night:
@@ -256,7 +273,7 @@ def run(pair, ymd, isMonthly):
                     x_n = x[night_index]
                     y_n = y[night_index]
                     w_n = weight[night_index] if weight is not None else None
-                    abr = plot(x_n, y_n, w_n, o_file,
+                    abr, bias = plot(x_n, y_n, w_n, o_file,
                                num_file, part1, part2, chan, str_time,
                                xname, xname_l, xunit, xmin, xmax,
                                yname, yname_l, yunit, ymin, ymax,
@@ -265,8 +282,13 @@ def run(pair, ymd, isMonthly):
                         dict_cabr_n[o_name][chan] = abr
                     else:
                         dict_cabr_n[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                    if bias:
+                        dict_md_n[xname][chan] = bias
+                    else:
+                        dict_md_n[xname][chan] = np.NaN
                 else:
                     dict_cabr_n[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
+                    dict_md_n[xname][chan] = np.NaN
             oneHDF5.clear()
         print('1')
         # write txt
@@ -276,15 +298,114 @@ def run(pair, ymd, isMonthly):
             for o_name in dict_cabr:
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr,
                          'ALL', isMonthly)
+                write_md(channel, part1, part2, xname, ymd,
+                         dict_md, 'ALL', isMonthly)
         if 'day' in Day_Night:
             for o_name in dict_cabr_d:
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_d,
                          'Day', isMonthly)
+                write_md(channel, part1, part2, xname, ymd,
+                         dict_md_d, 'Day', isMonthly)
         if 'night' in Day_Night:
             for o_name in dict_cabr_n:
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_n,
                          'Night', isMonthly)
+                write_md(channel, part1, part2, xname, ymd,
+                         dict_md_n, 'Night', isMonthly)
         lock.release()
+
+
+def write_md(channel, part1, part2, xname, ymd,
+             dict_md, day_or_night, is_monthly):
+    """
+    生成 RMD 文件
+    :param channel:
+    :param part1:
+    :param part2:
+    :param o_name:
+    :param ymd:
+    :param data:
+    :param DayOrNight:
+    :param isMonthly:
+    :return:
+    """
+    if not (xname in ["ref", "tbb"]):
+        return
+
+    for chan in channel:
+        o_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2), "MD")
+        file_name_monthly = os.path.join(
+            o_path, '%s_%s_%s_%s_%s_Monthly.txt' % (
+                part1, part2, xname.upper(), chan, day_or_night))
+        file_name_daily = os.path.join(
+            o_path, '%s_%s_%s_%s_%s_Daily.txt' % (
+                part1, part2, xname.upper(), chan, day_or_night))
+        title = 'date   MD\n'
+        data = "{}  {}\n".format(ymd, dict_md[xname][chan])
+
+        day_data_write(title, data, file_name_daily)
+
+        md_data = load_day_md(file_name_daily)
+        data_monthly = month_average(md_data)
+        with open(file_name_monthly, 'w') as f:
+            f.write(title)
+            f.writelines(data_monthly)
+
+        print file_name_daily
+        print file_name_monthly
+
+
+def load_day_md(md_file):
+    """
+    读取日的 MD 文件，返回 np.array
+    :param md_file:
+    :return:
+    """
+    names = ('date', 'md',)
+    formats = ('object', 'f4')
+    print md_file
+    data = np.loadtxt(md_file,
+                      converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                      dtype={'names': names,
+                             'formats': formats},
+                      skiprows=1, ndmin=1)
+    return data
+
+
+def month_average(day_data):
+    """
+    由 EXT 日数据生成 EXT 月平均数据
+    :param day_data: EXT 日数据
+    :return:
+    """
+    month_datas = []
+    ymd_start = day_data['date'][0]  # 第一天日期
+    ymd_end = day_data['date'][-1]  # 最后一天日期
+    date_start = ymd_start - relativedelta(days=(ymd_start.day - 1))  # 第一个月第一天日期
+
+    while date_start <= ymd_end:
+        # 当月最后一天日期
+        date_end = date_start + relativedelta(months=1) - relativedelta(days=1)
+
+        # 查找当月所有数据
+        day_date = day_data['date']
+        month_idx = np.where(np.logical_and(day_date >= date_start,
+                                            day_date <= date_end))
+
+        avg_month = day_data['md'][month_idx]
+        not_nan_idx = np.isfinite(avg_month)
+        avg_month = avg_month[not_nan_idx]
+
+        ymd_data = date_start.strftime('%Y%m%d')
+        avg_data = avg_month.mean()
+
+        data = "{}  {}\n".format(ymd_data, avg_data)
+
+        month_datas.append(data)
+
+        date_start = date_start + relativedelta(months=1)
+
+    return month_datas
 
 
 def writeTxt(channel, part1, part2, o_name, ymd,
@@ -359,29 +480,13 @@ def writeTxt(channel, part1, part2, o_name, ymd,
 
 def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
          xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax,
-         diagonal, isMonthly):
-    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
+         is_diagonal, isMonthly):
+    plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
+    print 'right 1'
 
-    titleName = '%s-%s' % (xname.upper(), yname.upper())
-    if xunit != "":
-        xlabel = '{} {} (${}$)'.format(part1, xname_l, xunit)
-    else:
-        xlabel = '{} {}'.format(part1, xname_l)
-
-    if yunit != "":
-        ylabel = '{} {} (${}$)'.format(part2, yname_l, yunit)
-    else:
-        ylabel = '{} {}'.format(part2, yname_l)
-
-    DictTitle_rad = {
-        'xlabel': xlabel,
-        'ylabel': ylabel,
-        'title': '{} Regression {} Days {}_{} {} {}'.format(
-            titleName, num_file, part1, part2, chan, ymd)}
-
+    # 过滤 正负 delta+8倍std 的杂点 ------------------------
     w = 1.0 / weight if weight is not None else None
     RadCompare = G_reg1d(x, y, w)
-    # 过滤 正负 delta+8倍std 的杂点 ------------------------
     reg_line = x * RadCompare[0] + RadCompare[1]
     delta = np.abs(y - reg_line)
     mean_delta = np.mean(delta)
@@ -396,48 +501,284 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     # -----------------------------------------
     RadCompare = G_reg1d(x, y, w)
     length_rad = len(x)
+    print 'right 2'
+    bias = None  # 当 bias 没有被计算的时候，不输出 bias
+    if not isMonthly and is_diagonal:
+        # return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]
+        fig = plt.figure(figsize=(14, 4.5))
+        fig.subplots_adjust(top=0.92, bottom=0.11, left=0.045, right=0.985)
+        ax1 = plt.subplot2grid((1, 3), (0, 0))
+        ax2 = plt.subplot2grid((1, 3), (0, 1))
+        ax3 = plt.subplot2grid((1, 3), (0, 2))
+        # 图片 Title
+        titleName = '%s-%s' % (xname.upper(), yname.upper())
+        title = '{} Regression {} Days {}_{} {} {}'.format(
+            titleName, num_file, part1, part2, chan, ymd)
 
-    pb_io.make_sure_path_exists(os.path.dirname(o_file))
+        # 画回归图 -----------------------------------------------
+        print 'draw regression'
+        regress_xmin = xmin
+        regress_xmax = xmax
+        regress_ymin = ymin
+        regress_ymax = ymax
+        regress_axislimit = {
+            "xlimit": (regress_xmin, regress_xmax),
+            "ylimit": (regress_ymin, regress_ymax),
+        }
 
-    if diagonal:
-        dv_pub_legacy.draw_Scatter_Bar(
-            x, y,
-            o_file, DictTitle_rad,
-            [['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
-              '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
-              '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-              '{:15}: {:7d}'.format('Number', length_rad)]], '',
-            part1, part2, xname, xname_l,
-            xmin, xmax, ymin, ymax)
+        if xunit != "":
+            xlabel = '{} {} (${}$)'.format(part1, xname_l, xunit)
+        else:
+            xlabel = '{} {}'.format(part1, xname_l)
 
-    else:
-        dv_pub_legacy.draw_Scatter(
-            x, y,
-            o_file, DictTitle_rad,
-            [['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
-             '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
-             '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-             '{:15}: {:7d}'.format('Number', length_rad)]], '',
-            xmin, xmax, ymin, ymax, diagonal)
-    if isMonthly:
+        if yunit != "":
+            ylabel = '{} {} (${}$)'.format(part2, yname_l, yunit)
+        else:
+            ylabel = '{} {}'.format(part2, yname_l)
+
+        regress_label = {
+            "xlabel": xlabel, "ylabel": ylabel,
+        }
+
+        regress_locator = {"locator_x": (5, 5), "locator_y": (5, 5)}
+
+        regress_annotate = {
+                "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+                         '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+                         '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+                         '{:15}: {:7d}'.format('Number', length_rad)]
+        }
+
+        regress_diagonal = {"line_color": '#808080', "line_width": 1.2}
+
+        regress_regressline = {"line_color": 'r', "line_width": 1.2}
+
+        scatter_point = {"scatter_alpha": 0.8}
+
+        dv_pub_3d.draw_regression(
+            ax1, x, y, regress_label, ax_annotate=regress_annotate,
+            axislimit=regress_axislimit, locator=regress_locator,
+            diagonal=regress_diagonal, regressline=regress_regressline,
+            scatter_point=scatter_point,
+        )
+
+        # 画偏差分布图 ---------------------------------------------
+        print 'draw distribution'
+
+        distri_xmin = xmin
+        distri_xmax = xmax
+        if xname == "tbb":
+            distri_ymin = -4
+            distri_ymax = 4
+        elif xname == "ref":
+            distri_ymin = -0.08
+            distri_ymax = 0.08
+        else:
+            distri_ymin = None
+            distri_ymax = None
+        distri_limit = {
+            "xlimit": (distri_xmin, distri_xmax),
+            "ylimit": (distri_ymin, distri_ymax),
+        }
+
+        # x y 轴标签
+        xlabel = "{}".format(xname_l)
+        ylabel = "{} minus {} {} bias".format(part1, part2, xname)
+        distri_label = {
+            "xlabel": xlabel, "ylabel": ylabel,
+        }
+
+        # 获取 MeanBias 信息
+        boundary = xmin + (xmax - xmin) * 0.15
+        bias_info = bias_information(x, y, boundary)
+
+        # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
+        bias = np.NaN  # RMD or TBB bias
+        bias_info_md = ''
+        ab = RadCompare
+        a = ab[0]
+        b = ab[1]
+        if xname == 'tbb':
+            bias = 250 - (250 * a + b)
+            bias_info_md = "TBB Bias (250K) : {:.4f} K".format(bias)
+        elif xname == 'ref':
+            bias = (0.25 - (0.25 * a + b)) / 0.25 * 100
+            bias_info_md = "Relative Bias (REF 0.25) : {:.4f} %".format(bias)
+
+        # 添加注释信息
+        distri_annotate = {"left": [], "right": []}
+        distri_annotate.get("left").append(bias_info.get("info_lower"))
+        distri_annotate.get("left").append(bias_info.get("info_greater"))
+        distri_annotate.get("left").append(bias_info_md)
+
+        # 添加间隔数量
+        distri_locator = {"locator_x": (5, 5), "locator_y": (8, 5)}
+
+        # y=0 线配置
+        zeroline = {"line_color": '#808080', "line_width": 1.0}
+
+        # 偏差点配置
+        scatter_delta = {
+            "scatter_marker": 'o', "scatter_size": 5, "scatter_alpha": 0.8,
+            "scatter_linewidth": 0, "scatter_zorder": 100,
+            "scatter_color": BLUE,
+        }
+
+        # 偏差回归线配置
+        regressline = {"line_color": 'r', "line_width": 1.2}
+        print "ddddd1"
+        dv_pub_3d.draw_distribution(ax2, x, y, label=distri_label,
+                                    ax_annotate=distri_annotate,
+                                    axislimit=distri_limit,
+                                    locator=distri_locator,
+                                    zeroline=zeroline,
+                                    scatter_delta=scatter_delta,
+                                    regressline=regressline,
+                                    )
+
+        # 画直方图 --------------------------------------------------
+        histogram_xmin = xmin
+        histogram_xmax = xmax
+        histogram_axislimit = {
+            "xlimit": (histogram_xmin, histogram_xmax),
+        }
+
+        histogram_xlabel = "{}".format(xname_l)
+        histogram_ylabel = "match point numbers"
+        histogram_label = {
+            "xlabel": histogram_xlabel, "ylabel": histogram_ylabel,
+        }
+
+        # 添加间隔数量
+        histogram_locator = {"locator_x": (5, 5), "locator_y": (None, 5)}
+
+        histogram_x = {
+            "label": part1, "color": "red", "alpha": 0.4, "bins": 100
+        }
+        histogram_y = {
+            "label": part2, "color": "blue", "alpha": 0.4, "bins": 100
+        }
+
+        dv_pub_3d.draw_histogram(
+            ax3, x, label=histogram_label, locator=histogram_locator,
+            axislimit=histogram_axislimit, histogram=histogram_x,
+        )
+
+        dv_pub_3d.draw_histogram(
+            ax3, y, label=histogram_label, locator=histogram_locator,
+            axislimit=histogram_axislimit, histogram=histogram_y,
+        )
+        print 'right 4'
+    elif not isMonthly and not is_diagonal:
+        fig = plt.figure(figsize=(4.5, 4.5))
+        fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
+        ax1 = plt.subplot2grid((1, 1), (0, 0))
+        # 图片 Title
+        titleName = '%s-%s' % (xname.upper(), yname.upper())
+        title = '{} Regression {} Days\n{}_{} {} {}'.format(
+            titleName, num_file, part1, part2, chan, ymd)
+        # 画回归图 ----------------------------------------------------
+        print 'draw regression'
+        regress_xmin = xmin
+        regress_xmax = xmax
+        regress_ymin = ymin
+        regress_ymax = ymax
+        regress_axislimit = {
+            "xlimit": (regress_xmin, regress_xmax),
+            "ylimit": (regress_ymin, regress_ymax),
+        }
+
+        if xunit != "":
+            xlabel = '{} {} (${}$)'.format(part1, xname_l, xunit)
+        else:
+            xlabel = '{} {}'.format(part1, xname_l)
+
+        if yunit != "":
+            ylabel = '{} {} (${}$)'.format(part2, yname_l, yunit)
+        else:
+            ylabel = '{} {}'.format(part2, yname_l)
+
+        regress_label = {
+            "xlabel": xlabel, "ylabel": ylabel,
+        }
+
+        regress_locator = {"locator_x": (5, 5), "locator_y": (5, 5)}
+
+        regress_annotate = {
+            "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+                     '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+                     '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+                     '{:15}: {:7d}'.format('Number', length_rad)]
+        }
+
+        regress_diagonal = {"line_color": '#808080', "line_width": 1.2}
+
+        regress_regressline = {"line_color": 'r', "line_width": 1.2}
+
+        scatter_point = {"scatter_alpha": 0.8}
+
+        dv_pub_3d.draw_regression(
+            ax1, x, y, regress_label, ax_annotate=regress_annotate,
+            axislimit=regress_axislimit, locator=regress_locator,
+            diagonal=regress_diagonal, regressline=regress_regressline,
+            scatter_point=scatter_point,
+        )
+    elif isMonthly:
         o_file = o_file + "_density"
-        dv_pub_legacy.draw_density(
-            x, y,
-            o_file, DictTitle_rad,
-            [['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
-             '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
-             '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-             '{:15}: {:7d}'.format('Number', length_rad)]], '',
-            xmin, xmax, ymin, ymax, diagonal)
 
-    return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]  # num, a, b, r
+        fig = plt.figure(figsize=(4.5, 4.5))
+        fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
+        ax1 = plt.subplot2grid((1, 1), (0, 0))
+        # 图片 Title Label
+        titleName = '%s-%s' % (xname.upper(), yname.upper())
+        title = '{} Regression {} Days\n{}_{} {} {}'.format(
+            titleName, num_file, part1, part2, chan, ymd)
+        # 画密度图 -----------------------------------------------------
+        if xunit != "":
+            xlabel = '{} {} (${}$)'.format(part1, xname_l, xunit)
+        else:
+            xlabel = '{} {}'.format(part1, xname_l)
+
+        if yunit != "":
+            ylabel = '{} {} (${}$)'.format(part2, yname_l, yunit)
+        else:
+            ylabel = '{} {}'.format(part2, yname_l)
+
+        density_xmin = xmin
+        density_xmax = xmax
+        density_ymin = ymin
+        density_ymax = ymax
+        density_axislimit = {
+            "xlimit": (density_xmin, density_xmax),
+            "ylimit": (density_ymin, density_ymax),
+        }
+        density_label = {
+            "xlabel": xlabel, "ylabel": ylabel,
+        }
+        # dv_pub_3d.draw_density(
+        #     ax1, x, y, label=density_label,
+        #     axislimit=density_axislimit,
+        # )
+    else:
+        print 'No output Pic {} : '.format(ymd)
+        return
+
+    print 'right 3'
+    fig.suptitle(title, fontsize=11, fontproperties=FONT0)
+    pb_io.make_sure_path_exists(os.path.dirname(o_file))
+    fig.savefig(o_file, dpi=100)
+    print o_file
+    fig.clear()
+    plt.close()
+
+    return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]], bias  # num, a, b, r, md
 
 
 def G_reg1d(xx, yy, ww=None):
-    '''
+    """
     description needed
     ww: weights
-    '''
+    """
     rtn = []
     ab = polyfit(xx, yy, 1, w=ww)
     rtn.append(ab[0])
@@ -450,19 +791,7 @@ def G_reg1d(xx, yy, ww=None):
     return rtn
 
 
-# def isDay(sec):
-#     '''
-#     not used
-#     '''
-#     mjd = sec / 24. / 3600. + 48988.
-#     dt = datetime.datetime(1858, 11, 17) + relativedelta(days=mjd)
-#     return dt.hour == 0
-
 ######################### 程序全局入口 ##############################
-
-# ###### test start
-# run('FY3D+MERSI_METOP-A+IASI', '20180101-20180101', False)
-# ###### test end
 
 # 获取程序参数接口
 args = sys.argv[1:]
