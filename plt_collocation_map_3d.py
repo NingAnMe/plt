@@ -35,7 +35,7 @@ def run(pair, ymd):
         Type = "LEOLEO"
     else:
         return
-
+    print('1')
     # load yaml config file
     plt_cfg_file = os.path.join(MainPath, '%s_%s_3d.yaml' % (sensor1, sensor2))
     plt_cfg = loadYamlCfg(plt_cfg_file)
@@ -46,7 +46,9 @@ def run(pair, ymd):
     PERIOD = plt_cfg['collocation_map']['days']  # 回滚天数
     chans = plt_cfg['collocation_map']['chan']  # 通道
     maptype = plt_cfg['collocation_map']['maptype']  # 需要绘制的类型
+    print('maptype', maptype)
 
+    print('2')
     if 'area' in maptype:  # 区域块视图
         area = plt_cfg['collocation_map']['area']
     else:
@@ -60,7 +62,9 @@ def run(pair, ymd):
         return
     else:
         map_range = (polar, area)
+        print('map_range:', map_range)
 
+    print('3')
     Log.info(u"----- Start Drawing Matched Map-Pic,"
              u" PAIR: {}, YMD: {}, PERIOD: {} -----".format(pair, ymd, PERIOD))
 
@@ -83,18 +87,18 @@ def run(pair, ymd):
         if not oneHDF5.LoadData(filefullpath, chans):
             Log.error('Error occur when reading %s of %s' % (chans,
                                                              filefullpath))
-
+    print('4')
     if num_file == 0:
         Log.error(u"No file found.")
         return
     elif num_file != PERIOD:
         Log.error(u"{} of {} file(s) found.".format(num_file, PERIOD))
-
+    print('5')
     cur_path = os.path.join(DMS_DIR, pair, ymd)
 
     o_file = os.path.join(cur_path,
                           '%s_%s_MatchedPoints_ALL_%s' % (part1, part2, ymd))
-
+    print('6')
     # FY2F+VISSR-MetopA+IASI_MatchedPoints_ALL_20150226.png
 
     # find out day and night
@@ -105,13 +109,15 @@ def run(pair, ymd):
 
     x = oneHDF5.lon1  # 经度数据
     y = oneHDF5.lat1  # 维度数据
-
+    print('x, y:', len(x), len(y))
 #     d = NC.days.astype('uint8')  # trans to int
 #     if len(d) == 0:
 #         Log.error('No days info in NC.')
 #         return
 
+    print('7')
     draw_butterfly(part1, part2, cur_ymd, ymd, x, y, o_file, map_range)
+    print('8')
     # ------- day ----------
     if np.where(day_index)[0].size > 0:
         o_file = os.path.join(cur_path,
@@ -121,6 +127,7 @@ def run(pair, ymd):
         y_d = y[day_index]
 #         d_d = d[day_index]
         draw_butterfly(part1, part2, cur_ymd, ymd, x_d, y_d, o_file, map_range)
+        print('10')
     # ---------night ------------
     if np.where(night_index)[0].size > 0:
         o_file = os.path.join(cur_path,
@@ -130,6 +137,7 @@ def run(pair, ymd):
         y_n = y[night_index]
 #         d_n = d[night_index]
         draw_butterfly(part1, part2, cur_ymd, ymd, x_n, y_n, o_file, map_range)
+        print('11')
     Log.info(u"Success")
 
 
@@ -140,6 +148,7 @@ def draw_butterfly(sat1Nm, sat2Nm,
     """
     画 FY3X 匹配蝴蝶图
     """
+    plt.style.use(os.path.join(dvPath, 'dv_pub_map.mplstyle'))
     print('date, lons, lats', ymd_e, len(lons), len(lats))
 #     COLORS = ['#4cd964', '#1abc9c', '#5ac8fa', '#007aff', '#5856d6']
     COLORS = [RED]
@@ -202,12 +211,12 @@ def draw_butterfly(sat1Nm, sat2Nm,
         fig.text(0.55, TEXT_Y, '%s' % ymd_s, fontproperties=FONT0)
     fig.text(0.83, TEXT_Y, ORG_NAME, fontproperties=FONT0)
 
-
+    print('out start')
     pb_io.make_sure_path_exists(os.path.dirname(out_fig_file))
     fig.savefig(out_fig_file, dpi=100)
-
-    fig.clear()
+    print('out end')
     plt.close()
+    fig.clear()
 
 
 def drawFig_map(ax, n_s, range):
@@ -218,18 +227,18 @@ def drawFig_map(ax, n_s, range):
 #         resolution='c', area_thresh=10000., projection='cyl', \
 #         lat_ts=20.)
     if n_s == "area":
-
+        print('area range', range)
         area_range = range
         llcrnrlat = area_range[0]
         urcrnrlat = area_range[1]
         llcrnrlon = area_range[2]
         urcrnrlon = area_range[3]
-
+        print('area')
         m = Basemap(llcrnrlat=llcrnrlat, urcrnrlat=urcrnrlat,
                     llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon,
                     resolution='c', area_thresh=10000.,
                     projection='cyl', lat_ts=20., ax=ax)
-
+        print('area success')
         m.fillcontinents(color=GRAY)
 
         # draw parallels
@@ -251,22 +260,22 @@ def drawFig_map(ax, n_s, range):
                         labels=[0, 0, 0, 0],
                         dashes=[100, .0001], color='white')
         ax.set_title("Global Map", fontproperties=FONT0)
-
+        print('area 1')
     else:
         if n_s == "north":
-
+            print('north range', range)
             north_range = range[0]
             north_range = int(north_range[0])
             m = Basemap(projection='npaeqd', boundinglat=north_range-1,
                         lon_0=0, resolution='c', ax=ax)
-
+            print('north success')
         elif n_s == "south":
-
+            print('south range', range)
             south_range = range[1]
             south_range = int(south_range[0])
             m = Basemap(projection='spaeqd', boundinglat=south_range+1,
                         lon_0=180, resolution='c', ax=ax)
-
+            print('south success')
 
         m.fillcontinents(color=GRAY)
 
@@ -305,13 +314,6 @@ def drawFig_map(ax, n_s, range):
                         fontproperties=TICKER_FONT)
             ax.set_title("Southern Hemisphere", fontproperties=FONT0)
 
-    # 设置 Map 边框粗细
-
-    spines = ax.spines
-    for eachspine in spines:
-        spines[eachspine].set_linewidth(0)
-
-
     return m
 
 
@@ -338,6 +340,8 @@ if '-h' in args:
 # 获取程序所在位置，拼接配置文件
 MainPath, MainFile = os.path.split(os.path.realpath(__file__))
 ProjPath = os.path.dirname(MainPath)
+omPath = os.path.dirname(ProjPath)
+dvPath = os.path.join(os.path.dirname(omPath), 'DV')
 cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 
 # 配置不存在预警

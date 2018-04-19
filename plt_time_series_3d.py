@@ -265,7 +265,8 @@ def run(pair, date_s, date_e):
                          picPath, title, date_s, date_e)
 
 
-def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, satName):
+def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title,
+                date_s, date_e, satName):
     """
     画偏差时序折线图
     """
@@ -280,9 +281,9 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, 
     plt.plot(date_D, bias_D, 'x', ms=6,
              markerfacecolor=None, markeredgecolor=BLUE, alpha=0.8,
              mew=0.3, label='Daily')
-
     plt.plot(date_M, bias_M, 'o-', ms=5, lw=0.6, c=RED,
              mew=0, label='Monthly')
+
     plt.grid(True)
     plt.ylabel('DTB($K$)', fontsize=11, fontproperties=FONT0)
 
@@ -350,7 +351,7 @@ def setXLocator(ax, xlim_min, xlim_max):
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
         elif month_range <= 24.:
             months = mdates.MonthLocator(interval=2)
-            ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+            ax.xaxis.set_major_locator(months)
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
         elif month_range <= 48.:
             months = mdates.MonthLocator(interval=4)
@@ -366,9 +367,9 @@ def setXLocator(ax, xlim_min, xlim_max):
 
 
 def add_year_xaxis(ax, xlim_min, xlim_max):
-    '''
+    """
     add year xaxis
-    '''
+    """
     if xlim_min.year == xlim_max.year:
         ax.set_xlabel(xlim_min.year, fontsize=11, fontproperties=FONT0)
         return

@@ -13,6 +13,7 @@ import matplotlib as mpl
 from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
 from DV.dv_pub_legacy import plt, mdates, set_tick_font, FONT0
+import DV.dv_pub_3d
 from datetime import datetime
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 from matplotlib.ticker import MultipleLocator
@@ -121,14 +122,15 @@ class coeff_abr(object):
 
         return retAry
 
+
 def run(pair, date_s, date_e):
-    '''
+    """
     pair: sat1+sensor1_sat2+sensor2
     date_s: datetime of start date
             None  处理 从发星 到 有数据的最后一天
     date_e: datetime of end date
             None  处理 从发星 到 有数据的最后一天
-    '''
+    """
     isLaunch = False
     if date_s is None or date_e is None:
         isLaunch = True
@@ -250,6 +252,7 @@ def run(pair, date_s, date_e):
                                 picPath, title,
                                 date_s, date_e, sat1)
 
+
                 # plot interpolated TBBias img (obs minus backgroud) -------------
                 title = 'Brightness Temperature Correction\n%s  %s  %s' % \
                          (pair, chan, DayOrNight)
@@ -263,11 +266,14 @@ def run(pair, date_s, date_e):
                 plot_omb(date_D[idx_D], a_D[idx_D], b_D[idx_D],
                          picPath, title, date_s, date_e)
 
+                # plot RMD ----------------------------------------------------
+
+
 def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, satName):
     """
     画偏差时序折线图
     """
-    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
 #     plt.subplots_adjust(left=0.13, right=0.95, bottom=0.11, top=0.97)
 
@@ -281,6 +287,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, 
 
     plt.plot(date_M, bias_M, 'o-', ms=5, lw=0.6, c=RED,
              mew=0, label='Monthly')
+
     plt.grid(True)
     plt.ylabel('DTB($K$)', fontsize=11, fontproperties=FONT0)
 
@@ -328,6 +335,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, 
     fig.clear()
     plt.close()
 
+
 def setXLocator(ax, xlim_min, xlim_max):
     day_range = (xlim_max - xlim_min).days
 #     if day_range <= 2:
@@ -346,7 +354,7 @@ def setXLocator(ax, xlim_min, xlim_max):
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
         elif month_range <= 24.:
             months = mdates.MonthLocator(interval=2)
-            ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+            ax.xaxis.set_major_locator(months)
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
         elif month_range <= 48.:
             months = mdates.MonthLocator(interval=4)
@@ -360,10 +368,11 @@ def setXLocator(ax, xlim_min, xlim_max):
         if month_range <= 48:
             add_year_xaxis(ax, xlim_min, xlim_max)
 
+
 def add_year_xaxis(ax, xlim_min, xlim_max):
-    '''
+    """
     add year xaxis
-    '''
+    """
     if xlim_min.year == xlim_max.year:
         ax.set_xlabel(xlim_min.year, fontsize=11, fontproperties=FONT0)
         return
@@ -383,13 +392,14 @@ def add_year_xaxis(ax, xlim_min, xlim_max):
     set_tick_font(newax)
     newax.xaxis.set_tick_params(length=5)
 
+
 def plot_abc(date_D, a_D, b_D, c_D,
              date_M, a_M, b_M, c_M,
              picPath, title,
              date_s, date_e,
              slope_min, slope_max,
              var):
-    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 6))
     ax1 = plt.subplot(311)
     ax2 = plt.subplot(312, sharex=ax1)
@@ -507,6 +517,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
     plt.close()
     fig.clear
 
+
 def plot_omb(date_D, a_D, b_D,
              picPath, title,
              date_s, date_e):
@@ -595,6 +606,7 @@ def plot_omb(date_D, a_D, b_D,
     plt.savefig(picPath)
     fig.clear()
     plt.close()
+
 
 ######################### 程序全局入口 ##############################
 # 获取程序参数接口

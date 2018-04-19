@@ -146,7 +146,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     """
     画偏差时序折线图
     """
-    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
 #     plt.subplots_adjust(left=0.13, right=0.95, bottom=0.11, top=0.97)
 
@@ -167,7 +167,6 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     xlim_max = date_e
     plt.xlim(xlim_min, xlim_max)
     plt.ylim(-1, 1)
-    plt.plot([xlim_min, xlim_max], [0, 0], 'k')  # 在 y = 0 绘制一条黑色直线
 
     ax = plt.gca()
     # format the ticks
@@ -222,7 +221,7 @@ def setXLocator(ax, xlim_min, xlim_max):
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
         elif month_range <= 24.:
             months = mdates.MonthLocator(interval=2)
-            ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+            ax.xaxis.set_major_locator(months)
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
         elif month_range <= 48.:
             months = mdates.MonthLocator(interval=4)

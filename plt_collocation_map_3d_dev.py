@@ -148,6 +148,7 @@ def draw_butterfly(sat1Nm, sat2Nm,
     """
     画 FY3X 匹配蝴蝶图
     """
+    plt.style.use(os.path.join(dvPath, 'dv_pub_map.mplstyle'))
     print('date, lons, lats', ymd_e, len(lons), len(lats))
 #     COLORS = ['#4cd964', '#1abc9c', '#5ac8fa', '#007aff', '#5856d6']
     COLORS = [RED]
@@ -214,8 +215,10 @@ def draw_butterfly(sat1Nm, sat2Nm,
     pb_io.make_sure_path_exists(os.path.dirname(out_fig_file))
     fig.savefig(out_fig_file, dpi=100)
     print('out end')
-    fig.clear()
     plt.close()
+    fig.clear()
+
+
 
 def drawFig_map(ax, n_s, range):
     '''
@@ -312,14 +315,8 @@ def drawFig_map(ax, n_s, range):
                         fontproperties=TICKER_FONT)
             ax.set_title("Southern Hemisphere", fontproperties=FONT0)
 
-    # 设置 Map 边框粗细
-    print('spine start')
-    spines = ax.spines
-    for eachspine in spines:
-        spines[eachspine].set_linewidth(0)
-    print('spine end')
-
     return m
+
 
 def plot_matchpoint(m, lons, lats, color, alpha=1):
     # plot
@@ -344,6 +341,8 @@ if '-h' in args:
 # 获取程序所在位置，拼接配置文件
 MainPath, MainFile = os.path.split(os.path.realpath(__file__))
 ProjPath = os.path.dirname(MainPath)
+omPath = os.path.dirname(ProjPath)
+dvPath = os.path.join(os.path.dirname(omPath), 'DV')
 cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 
 # 配置不存在预警
