@@ -196,7 +196,6 @@ def plot(x, y, weight, picPath,
     if xname_l == "TBB":
         xname_l = "TB"
 
-
     # 过滤 正负 delta+8倍std 的杂点 ------------
     w = 1.0 / weight if weight is not None else None
     RadCompare = G_reg1d(x, y, w)
@@ -231,18 +230,26 @@ def plot(x, y, weight, picPath,
 
     # plot 偏差分布图 -------------------------------------------------
     # x y 轴范围
-    xmin_distri = xmin
-    xmax_distri = xmax
+    distri_xmin = xmin
+    distri_xmax = xmax
     if xname == "tbb":
-        ymin_distri = -4
-        ymax_distri = 4
+        distri_ymin = -4
+        distri_ymax = 4
     elif xname == "ref":
-        ymin_distri = -0.08
-        ymax_distri = 0.08
+        distri_ymin = -0.08
+        distri_ymax = 0.08
     else:
-        ymin_distri = None
-        ymax_distri = None
+        distri_ymin = None
+        distri_ymax = None
 
+    distri_limit = {
+        "xlimit": (distri_xmin, distri_xmax),
+        "ylimit": (distri_ymin, distri_ymax),
+    }
+
+    distri_locator = {
+        "locator_x": (None, None), "locator_y": (8, 5)
+    }
     # Distri label
     distri_label = {}
     if xunit != "":
@@ -262,10 +269,10 @@ def plot(x, y, weight, picPath,
     b = ab[1]
     if xname == 'tbb':
         bias_info_md = "TBB Bias ({} K) : {:.4f} K".format(
-            ref_temp, ref_temp * a + b - ref_temp)
+            ref_temp, ref_temp - (ref_temp * a + b))
     elif xname == 'ref':
         bias_info_md = "Relative Bias (REF {}) : {:.4f} %".format(
-            ref_temp, (ref_temp * a + b) / ref_temp * 100)
+            ref_temp, (ref_temp - (ref_temp * a + b)) / ref_temp * 100)
     else:
         bias_info_md = ""
 
@@ -305,15 +312,33 @@ def plot(x, y, weight, picPath,
         "fill_step": step,
     }
 
-    draw_distribution(ax1, x, y, label=distri_label,
-                      ax_annotate=distri_annotate,
-                      xmin=xmin_distri, xmax=xmax_distri,
-                      ymin=ymin_distri, ymax=ymax_distri,
-                      avxline=avxline, zeroline=zeroline,
-                      scatter_delta=scatter_delta, scatter_fill=scatter_fill,
+    draw_distribution(ax1, x, y, label=distri_label, ax_annotate=distri_annotate,
+                      axislimit=distri_limit, locator=distri_locator,
+                      zeroline=zeroline,
+                      scatter_delta=scatter_delta,
+                      avxline=avxline,
+                      scatter_fill=scatter_fill,
                       )
 
     # 绘制 Bar 图 -------------------------------------------------
+    bar_xmin = distri_xmin
+    bar_xmax = distri_xmax
+    bar_ymin = 0
+    bar_ymax = 7
+
+    bar_limit = {
+        "xlimit": (bar_xmin, bar_xmax),
+        "ylimit": (bar_ymin, bar_ymax),
+    }
+
+    if xname == "tbb":
+        bar_locator = {
+            "locator_x": (5, None), "locator_y": (7, 5)
+        }
+    elif xname == "ref":
+        bar_locator = {
+            "locator_x": (None, None), "locator_y": (7, 5)
+        }
 
     # bar 的宽度
     if xname == "tbb":
@@ -327,19 +352,18 @@ def plot(x, y, weight, picPath,
         "bar_width": width, "bar_color": BLUE, "bar_linewidth": 0,
         "text_size": 6, "text_font": FONT_MONO, "bar_step": step,
     }
+
     bar_annotate = {
-       "left": ['Total Number: %7d' % len(x)]
+        "left": ['Total Number: %7d' % len(x)]
     }
     bar_label = {
-        "xlabel": '%s %s' % (part2, xname_l) + ('($%s$)' % xunit if xunit != "" else ""),
+        "xlabel": '%s %s' % (part2, xname_l) + (
+            '($%s$)' % xunit if xunit != "" else ""),
         "ylabel": 'Number of sample points\nlog (base = 10)'
     }
 
-    ymin_bar = 0
-    ymax_bar = 7
     draw_bar(ax2, x, y, label=bar_label, ax_annotate=bar_annotate,
-             xmin=xmin_distri, xmax=xmax_distri,
-             ymin=ymin_bar, ymax=ymax_bar,
+             axislimit=bar_limit, locator=bar_locator,
              bar=bar,
              )
 
@@ -453,7 +477,8 @@ if len(args) == 2:
 
     while date_s <= date_e:
         ymd = date_s.strftime('%Y%m%d')
-        pool.apply_async(run, (satPair, ymd))
+        run(satPair, ymd)
+        # pool.apply_async(run, (satPair, ymd))
         date_s = date_s + relativedelta(months=1)
     pool.close()
     pool.join()
