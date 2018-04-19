@@ -541,7 +541,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         }
 
         if xname == "tbb":
-            regress_locator = {"locator_x": (5, 5), "locator_y": (5, 5)}
+            regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
         elif xname == "ref":
             regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
 
@@ -616,7 +616,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         # 添加间隔数量
         if xname == "tbb":
-            distri_locator = {"locator_x": (5, None), "locator_y": (8, 5)}
+            distri_locator = {"locator_x": (None, None), "locator_y": (8, 5)}
         elif xname == 'ref':
             distri_locator = {"locator_x": (None, None), "locator_y": (8, 5)}
 
@@ -657,7 +657,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         # 添加间隔数量
         if xname == "tbb":
-            histogram_locator = {"locator_x": (5, None), "locator_y": (None, 5)}
+            histogram_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
         elif xname == "ref":
             histogram_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
 
@@ -890,6 +890,7 @@ if len(args) == 2:
 
     while date_s <= date_e:
         ymd = date_s.strftime('%Y%m%d')
+        # run(satPair, ymd, isMonthly)
         pool.apply_async(run, (satPair, ymd, isMonthly))
         date_s = date_s + timeStep
 

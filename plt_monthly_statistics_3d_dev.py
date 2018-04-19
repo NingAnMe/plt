@@ -333,7 +333,7 @@ def plot(x, y, weight, picPath,
 
     if xname == "tbb":
         bar_locator = {
-            "locator_x": (5, None), "locator_y": (7, 5)
+            "locator_x": (None, None), "locator_y": (7, 5)
         }
     elif xname == "ref":
         bar_locator = {
