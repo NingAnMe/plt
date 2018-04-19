@@ -9,7 +9,7 @@ figure.facecolor: white
 
 # grid
 grid.color: .15
-grid.linestyle: -.
+grid.linestyle: dotted
 
 # axes
 axes.axisbelow: True
