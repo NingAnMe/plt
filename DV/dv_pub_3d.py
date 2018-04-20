@@ -15,6 +15,7 @@ import matplotlib as mpl
 mpl.use('Agg')  # 必须加这个字段，否则引用 pyplot 服务器会报错，服务器上面没有 TK 框架
 
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from matplotlib.ticker import MultipleLocator
 from matplotlib.font_manager import FontProperties
 
@@ -270,6 +271,63 @@ def bias_information(x, y, boundary=0.1):
                  "info_lower": info_lower, "info_greater": info_greater}
 
     return bias_info
+
+
+def set_x_locator(ax, xlim_min, xlim_max):
+    day_range = (xlim_max - xlim_min).days
+#     if day_range <= 2:
+#         days = mdates.HourLocator(interval=4)
+#         ax.xaxis.set_major_locator(days)
+#         ax.xaxis.set_major_formatter(mdates.DateFormatter('%H'))
+    if day_range <= 60:
+        days = mdates.DayLocator(interval=(day_range / 6))
+        ax.xaxis.set_major_locator(days)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+    else:
+        month_range = day_range / 30
+        if month_range <= 12.:
+            months = mdates.MonthLocator()  # every month
+            ax.xaxis.set_major_locator(months)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+        elif month_range <= 24.:
+            months = mdates.MonthLocator(interval=2)
+            ax.xaxis.set_major_locator(months)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+        elif month_range <= 48.:
+            months = mdates.MonthLocator(interval=4)
+            ax.xaxis.set_major_locator(months)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+        else:
+            years = mdates.YearLocator()
+            ax.xaxis.set_major_locator(years)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+
+        if month_range <= 48:
+            add_year_xaxis(ax, xlim_min, xlim_max)
+
+
+def add_year_xaxis(ax, xlim_min, xlim_max):
+    """
+    add year xaxis
+    """
+    if xlim_min.year == xlim_max.year:
+        ax.set_xlabel(xlim_min.year, fontsize=11, fontproperties=FONT0)
+        return
+    newax = ax.twiny()
+    newax.set_frame_on(True)
+    newax.grid(False)
+    newax.patch.set_visible(False)
+    newax.xaxis.set_ticks_position('bottom')
+    newax.xaxis.set_label_position('bottom')
+    newax.set_xlim(xlim_min, xlim_max)
+    newax.xaxis.set_major_locator(mdates.YearLocator())
+    newax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    newax.spines['bottom'].set_position(('outward', 20))
+    newax.spines['bottom'].set_linewidth(0.6)
+
+    newax.tick_params(which='both', direction='in')
+    set_tick_font(newax)
+    newax.xaxis.set_tick_params(length=5)
 
 
 def draw_regression(ax, x, y, label=None, ax_annotate=None,
@@ -814,6 +872,9 @@ def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
             ax.yaxis.set_minor_locator(
                 MultipleLocator(
                     (yticklocs[1] - yticklocs[0]) / minor_locator_y))
+    
+    # 添加 x 轴年月标签文字
+    set_x_locator(ax, xmin, xmax)
 
     # 注释，格式 ['annotate1', 'annotate2']
     if ax_annotate is not None:
@@ -826,7 +887,7 @@ def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
     # 标签
     if label is not None:
         add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
-        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel", fontsize=11)  # y 轴标签
 
     # 设置 tick 字体
     set_tick_font(ax)
