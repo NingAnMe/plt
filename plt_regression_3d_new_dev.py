@@ -363,7 +363,6 @@ def load_day_md(md_file):
     """
     names = ('date', 'md',)
     formats = ('object', 'f4')
-    print md_file
     data = np.loadtxt(md_file,
                       converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
                       dtype={'names': names,

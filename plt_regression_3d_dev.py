@@ -322,11 +322,11 @@ def write_md(channel, part1, part2, xname, ymd,
     :param channel:
     :param part1:
     :param part2:
-    :param o_name:
+    :param xname:
     :param ymd:
-    :param data:
-    :param DayOrNight:
-    :param isMonthly:
+    :param dict_md:
+    :param day_or_night:
+    :param is_monthly:
     :return:
     """
     if not (xname in ["ref", "tbb"]):
@@ -363,7 +363,6 @@ def load_day_md(md_file):
     """
     names = ('date', 'md',)
     formats = ('object', 'f4')
-    print md_file
     data = np.loadtxt(md_file,
                       converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
                       dtype={'names': names,
