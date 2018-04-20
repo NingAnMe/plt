@@ -358,7 +358,7 @@ def plot_tbbias(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
         return
     plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
-    fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
+    # fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
 
     ax1 = plt.subplot2grid((1, 1), (0, 0))
 
@@ -426,8 +426,9 @@ def plot_tbbias(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
         zeroline=timeseries_zeroline, timeseries=timeseries_monthly,
     )
     # --------------------
+    plt.tight_layout()
     fig.suptitle(title, fontsize=11, fontproperties=FONT0)
-    fig.subplots_adjust(bottom=0.2)
+    fig.subplots_adjust(bottom=0.2, top=0.88)
 
     circle1 = mpatches.Circle((74, 15), 6, color=BLUE, ec=EDGE_GRAY, lw=0)
     circle2 = mpatches.Circle((164, 15), 6, color=RED, ec=EDGE_GRAY, lw=0)
@@ -461,7 +462,7 @@ def plot_rmd(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
         return
     plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
-    fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
+    # fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
 
     ax1 = plt.subplot2grid((1, 1), (0, 0))
 
@@ -528,8 +529,9 @@ def plot_rmd(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
         zeroline=timeseries_zeroline, timeseries=timeseries_monthly,
     )
     # --------------------
+    plt.tight_layout()
     fig.suptitle(title, fontsize=11, fontproperties=FONT0)
-    fig.subplots_adjust(bottom=0.2)
+    fig.subplots_adjust(bottom=0.2, top=0.88)
 
     circle1 = mpatches.Circle((74, 15), 6, color=BLUE, ec=EDGE_GRAY, lw=0)
     circle2 = mpatches.Circle((164, 15), 6, color=RED, ec=EDGE_GRAY, lw=0)
