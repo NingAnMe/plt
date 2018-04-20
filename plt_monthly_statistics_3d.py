@@ -1,31 +1,37 @@
 # coding: utf-8
-'''
+"""
 Created on 2016年1月6日
 读取匹配后的HDF5文件，画散点回归图，生成abr文件
 
 @author: duxiang, zhangtao, anning
-'''
+"""
+import calendar
+import os
+import sys
+from datetime import datetime
+from multiprocessing import Pool
+
 import numpy as np
-from multiprocessing import Pool , Lock
-import os, sys, calendar
+from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
+from PB.CSC.pb_csc_console import LogServer
 from configobj import ConfigObj
 from dateutil.relativedelta import relativedelta
 from matplotlib.ticker import MultipleLocator
 from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
-from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
-from DV.dv_pub_legacy import plt, add_annotate, set_tick_font, FONT0, FONT_MONO
+
+from DV.dv_pub_3d import plt, add_annotate, set_tick_font, FONT0, FONT_MONO,\
+    draw_distribution, draw_bar, draw_histogram, bias_information
 from PB import pb_time, pb_io
-from PB.CSC.pb_csc_console import LogServer
-from datetime import datetime
 from plt_io import ReadHDF5, loadYamlCfg
 
+
 def run(pair, ymd):
-    '''
+    """
     pair: sat1+sensor1_sat2+sensor2
     ymd: str YYYYMMDD
-    '''
+    """
     part1, part2 = pair.split('_')
     sat1, sensor1 = part1.split('+')
     sat2, sensor2 = part2.split('+')
@@ -186,9 +192,9 @@ def plot(x, y, weight, picPath,
     x: 参考卫星传感器数据
     y: FY数据
     """
-    if xname_l == "TBB": xname_l = "TB"
-    xlim_min = xmin
-    xlim_max = xmax
+    plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
+    if xname_l == "TBB":
+        xname_l = "TB"
 
     # 过滤 正负 delta+8倍std 的杂点 ------------
     w = 1.0 / weight if weight is not None else None
@@ -206,107 +212,176 @@ def plot(x, y, weight, picPath,
     w = w[idx] if weight is not None else None
     # -----------------------------------------
 
-    # 修改偏差值为国内减国外： x - y
-    delta = x - y
-
     if xname == "tbb":
         step = 5
     else:
         step = 0.1
-    T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xlim_min, xlim_max, step)
 
-    RadCompare = G_reg1d(x, y)
+    RadCompare = G_reg1d(x, y, w)
     a, b = RadCompare[0], RadCompare[1]
 
+    # 开始绘图
     fig = plt.figure(figsize=(6, 5))
-    ax1 = plt.subplot(211)
-    ax2 = plt.subplot(212, sharex=ax1)
-
-    # format the Xticks
-    ax1.set_xlim(xlim_min, xlim_max)
-
-    # format the Yticks
-    if xname == "tbb":
-        ax1.set_ylim(-4, 4)
-        ax1.yaxis.set_major_locator(MultipleLocator(2))
-        ax1.yaxis.set_minor_locator(MultipleLocator(1))
-    elif xname == "ref":
-        ax1.set_ylim(-0.08, 0.08)
-        ax1.yaxis.set_major_locator(MultipleLocator(0.02))
-        ax1.yaxis.set_minor_locator(MultipleLocator(0.01))
-    ax2.set_ylim(0, 7)
-    ax2.yaxis.set_major_locator(MultipleLocator(1))
-    ax2.yaxis.set_minor_locator(MultipleLocator(0.2))
-
+    ax1 = plt.subplot2grid((2, 1), (0, 0))
+    ax2 = plt.subplot2grid((2, 1), (1, 0))
+    # 图片 Title
     title = '%s Bias Monthly Statistics\n%s Minus %s  %s  %s' % \
             (xname_l, part1, part2, chan, DayOrNight)
-    # plot ax1 -------------------------------------------------
-    plt.sca(ax1)
-    strlist = [[]]
-    for ref_temp in reference_list:
-        plt.axvline(x=ref_temp, color='#4cd964', lw=0.7)
-        ax1.annotate(str(ref_temp) + xunit, (ref_temp, -3.5),
-                     va="top", ha="center", color=EDGE_GRAY,
-                     size=6, fontproperties=FONT_MONO)
-        strlist[0].append("%s Bias %s: %6.3f" %
-                          (xname_l, str(ref_temp) + xunit, ref_temp * a + b - ref_temp))
-    strlist[0].append('Total Number: %7d' % len(x))
-    plt.plot(x, delta, 'o', ms=1.5,
-             markerfacecolor=BLUE, alpha=0.5,
-             mew=0, zorder=10)
-    plt.plot(T_seg, mean_seg, 'o-',
-             ms=6, lw=0.6, c=RED,
-             mew=0, zorder=50)
-    plt.fill_between(T_seg, mean_seg - std_seg, mean_seg + std_seg,
-                     facecolor=RED, edgecolor=RED,
-                     interpolate=True, alpha=0.4, zorder=100)
 
-    ylabel = 'D%s' % (xname_l) + ('($%s$)' % xunit if xunit != "" else "")
-    plt.ylabel(ylabel, fontsize=11, fontproperties=FONT0)
-    plt.grid(True)
-    plt.title(title, fontsize=12, fontproperties=FONT0)
-    set_tick_font(ax1)
-    plt.setp(ax1.get_xticklabels(), visible=False)
+    # plot 偏差分布图 -------------------------------------------------
+    # x y 轴范围
+    distri_xmin = xmin
+    distri_xmax = xmax
+    if xname == "tbb":
+        distri_ymin = -4
+        distri_ymax = 4
+    elif xname == "ref":
+        distri_ymin = -0.08
+        distri_ymax = 0.08
+    else:
+        distri_ymin = None
+        distri_ymax = None
 
-    # point number -------------------------------------------------
-    plt.sca(ax2)
+    distri_limit = {
+        "xlimit": (distri_xmin, distri_xmax),
+        "ylimit": (distri_ymin, distri_ymax),
+    }
+
+    distri_locator = {
+        "locator_x": (None, None), "locator_y": (8, 5)
+    }
+    # Distri label
+    distri_label = {}
+    if xunit != "":
+        ylabel = 'D{}({})'.format(xname_l, xunit)
+    else:
+        ylabel = "D{}".format(xname_l)
+    distri_label["ylabel"] = ylabel
+
+    ref_temp = reference_list[0]  # 获取拟合系数
+
+    # 获取 MeanBias 信息
+    bias_info = bias_information(x, y, 0.1)
+
+    # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
+    ab = RadCompare
+    a = ab[0]
+    b = ab[1]
+    if xname == 'tbb':
+        bias_info_md = "TBB Bias ({} K) : {:.4f} K".format(
+            ref_temp, ref_temp - (ref_temp * a + b))
+    elif xname == 'ref':
+        bias_info_md = "Relative Bias (REF {}) : {:.4f} %".format(
+            ref_temp, (ref_temp - (ref_temp * a + b)) / ref_temp * 100)
+    else:
+        bias_info_md = ""
+
+    # 配置注释信息
+    distri_annotate = {"left": [bias_info.get("info_lower"),
+                                bias_info.get("info_greater"),
+                                bias_info_md]}
+    # 注释线配置
+    if xname == "tbb":
+        avxline = {
+            'line_x': ref_temp, 'line_color': '#4cd964', 'line_width': 0.7,
+            'word': str(ref_temp) + xunit, 'word_color': EDGE_GRAY,
+            'word_size': 6, 'word_location': (ref_temp, -3.5)
+        }
+    elif xname == "ref":
+        avxline = {
+            'line_x': ref_temp, 'line_color': '#4cd964', 'line_width': 0.7,
+            'word': str(ref_temp) + xunit, 'word_color': EDGE_GRAY,
+            'word_size': 6, 'word_location': (ref_temp, -0.07)
+        }
+    else:
+        avxline = None
+        distri_annotate = None
+
+    # y=0 线配置
+    zeroline = {"line_color": '#808080', "line_width": 1.0}
+
+    # 偏差点配置
+    scatter_delta = {
+        "scatter_marker": 'o', "scatter_size": 1.5, "scatter_alpha": 0.5,
+        "scatter_linewidth": 0, "scatter_zorder": 100, "scatter_color": BLUE,
+    }
+    # 偏差 fill 配置
+    scatter_fill = {
+        "fill_marker": 'o-', "fill_size": 6, "fill_alpha": 0.5,
+        "fill_linewidth": 0.6, "fill_zorder": 50, "fill_color": RED,
+        "fill_step": step,
+    }
+
+    draw_distribution(ax1, x, y, label=distri_label, ax_annotate=distri_annotate,
+                      axislimit=distri_limit, locator=distri_locator,
+                      zeroline=zeroline,
+                      scatter_delta=scatter_delta,
+                      avxline=avxline,
+                      scatter_fill=scatter_fill,
+                      )
+
+    # 绘制 Bar 图 -------------------------------------------------
+    bar_xmin = distri_xmin
+    bar_xmax = distri_xmax
+    bar_ymin = 0
+    bar_ymax = 7
+
+    bar_limit = {
+        "xlimit": (bar_xmin, bar_xmax),
+        "ylimit": (bar_ymin, bar_ymax),
+    }
+
+    if xname == "tbb":
+        bar_locator = {
+            "locator_x": (None, None), "locator_y": (7, 5)
+        }
+    elif xname == "ref":
+        bar_locator = {
+            "locator_x": (None, None), "locator_y": (7, 5)
+        }
+
+    # bar 的宽度
     if xname == "tbb":
         width = 3
     elif xname == "ref":
         width = 0.07
-    plt.bar(T_seg, np.log10(sampleNums), width=width, align="center",
-            color=BLUE, linewidth=0)
-    for i, T in enumerate(T_seg):
-        if sampleNums[i] > 0:
-            plt.text(T, np.log10(sampleNums[i]) + 0.2, '%d' % int(sampleNums[i]), ha="center",
-                     fontsize=6, fontproperties=FONT_MONO)
+    else:
+        width = 1
+    # bar 配置
+    bar = {
+        "bar_width": width, "bar_color": BLUE, "bar_linewidth": 0,
+        "text_size": 6, "text_font": FONT_MONO, "bar_step": step,
+    }
 
-    add_annotate(ax2, strlist, 'left', EDGE_GRAY, 9)
-    plt.ylabel('Number of sample points\nlog (base = 10)', fontsize=11, fontproperties=FONT0)
-    xlabel = '%s %s' % (part2, xname_l) + ('($%s$)' % xunit if xunit != "" else "")
-    plt.xlabel(xlabel, fontsize=11, fontproperties=FONT0)
-    plt.grid(True)
-    set_tick_font(ax2)
+    bar_annotate = {
+        "left": ['Total Number: %7d' % len(x)]
+    }
+    bar_label = {
+        "xlabel": '%s %s' % (part2, xname_l) + (
+            '($%s$)' % xunit if xunit != "" else ""),
+        "ylabel": 'Number of sample points\nlog (base = 10)'
+    }
 
-    #---------------
+    draw_bar(ax2, x, y, label=bar_label, ax_annotate=bar_annotate,
+             axislimit=bar_limit, locator=bar_locator,
+             bar=bar,
+             )
+
+    # ---------------
     plt.tight_layout()
+    # 将 ax1 的 xticklabels 设置为不可见
+    plt.setp(ax1.get_xticklabels(), visible=False)
+
+    # 子图的底间距
     fig.subplots_adjust(bottom=0.16)
-
-#     circle1 = mpatches.Circle((74, 18), 5, color=BLUE, ec=EDGE_GRAY, lw=0)
-#     circle2 = mpatches.Circle((164, 18), 5, color=RED, ec=EDGE_GRAY, lw=0)
-#     fig.patches.extend([circle1, circle2])
-#
-#     fig.text(0.15, 0.02, 'Daily', color=BLUE, fontproperties=FONT0)
-#     fig.text(0.3, 0.02, 'Monthly', color=RED, fontproperties=FONT0)
-
-    fig.text(0.6, 0.02, '%s' % ym, fontproperties=FONT0)
-    fig.text(0.8, 0.02, ORG_NAME, fontproperties=FONT0)
-    #---------------
+    fig.text(0.6, 0.02, '%s' % ym, fontsize=11, fontproperties=FONT0)
+    fig.text(0.8, 0.02, ORG_NAME, fontsize=11, fontproperties=FONT0)
+    # ---------------
 
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     fig.savefig(picPath)
     plt.close()
-    fig.clear
+    fig.clear()
 
 
 def G_reg1d(xx, yy, ww=None):
@@ -373,6 +448,8 @@ if '-h' in args:
 # 获取程序所在位置，拼接配置文件
 MainPath, MainFile = os.path.split(os.path.realpath(__file__))
 ProjPath = os.path.dirname(MainPath)
+omPath = os.path.dirname(ProjPath)
+dvPath = os.path.join(os.path.dirname(omPath), 'DV')
 cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 omdFile = os.path.join(ProjPath, 'cfg', 'dm_odm.cfg')
 
@@ -400,6 +477,7 @@ if len(args) == 2:
 
     while date_s <= date_e:
         ymd = date_s.strftime('%Y%m%d')
+        # run(satPair, ymd)
         pool.apply_async(run, (satPair, ymd))
         date_s = date_s + relativedelta(months=1)
     pool.close()

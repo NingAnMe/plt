@@ -13,6 +13,8 @@ import matplotlib as mpl
 from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
 from DV.dv_pub_legacy import plt, mdates, set_tick_font, FONT0
+
+from DV import dv_pub_3d
 from datetime import datetime
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 from matplotlib.ticker import MultipleLocator
@@ -105,6 +107,7 @@ class coeff_abr(object):
         convert = lambda x: datetime.strptime(x, "%Y%m%d")
         fnameLst.sort()
         for eachtxt in fnameLst:
+            print eachtxt
             fpath = os.path.join(self.path, eachtxt)
             ary = np.loadtxt(fpath,
                   converters={0:convert},
@@ -122,14 +125,31 @@ class coeff_abr(object):
         return retAry
 
 
+def get_md_data(md_file):
+    """
+    读取日的 MD 文件，返回 np.array
+    :param md_file:
+    :return:
+    """
+    names = ('date', 'md',)
+    formats = ('object', 'f4')
+    data = np.loadtxt(md_file,
+                      converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                      dtype={'names': names,
+                             'formats': formats},
+                      skiprows=1, ndmin=1)
+
+    return data
+
+
 def run(pair, date_s, date_e):
-    '''
+    """
     pair: sat1+sensor1_sat2+sensor2
     date_s: datetime of start date
             None  处理 从发星 到 有数据的最后一天
     date_e: datetime of end date
             None  处理 从发星 到 有数据的最后一天
-    '''
+    """
     isLaunch = False
     if date_s is None or date_e is None:
         isLaunch = True
@@ -156,7 +176,13 @@ def run(pair, date_s, date_e):
         if co.error:
             return
 
+        # 将每个对通用的属性值放到对循环，每个通道用到的属性值放到通道循环
         xname, yname = each.split('-')
+        xname_l = plt_cfg[each]['x_name']
+        xunit = plt_cfg[each]['x_unit']
+        yname_l = plt_cfg[each]['y_name']
+        yunit = plt_cfg[each]['y_unit']
+
         if 'tbb' in xname and 'tbb' in yname:
             o_name = 'TBBCalCoeff'
         elif 'ref' in xname and 'ref' in yname:
@@ -222,65 +248,111 @@ def run(pair, date_s, date_e):
                          date_M[idx_M], a_M[idx_M], b_M[idx_M], c_M[idx_M],
                          picPath, title, date_s, date_e, slope_min, slope_max, each)
 
+                # plot RMD ----------------------------------------------------
+                if xname == "ref" and yname == "ref":
+                    print "plot RMD"
+                    md_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
+                                           "MD")
+                    file_name_monthly = os.path.join(
+                        md_path, '%s_%s_%s_%s_%s_Monthly.txt' % (
+                            part1, part2, xname.upper(), chan, DayOrNight))
+                    file_name_daily = os.path.join(
+                        md_path, '%s_%s_%s_%s_%s_Daily.txt' % (
+                            part1, part2, xname.upper(), chan, DayOrNight))
+                    rmd_d = get_md_data(file_name_daily)
+                    rmd_m = get_md_data(file_name_monthly)
+
+                    date_rmd_d = rmd_d["date"]
+                    data_rmd_d = rmd_d["md"]
+                    date_rmd_m = rmd_m["date"]
+                    date_rmd_m = date_rmd_m + relativedelta(days=14)
+                    data_rmd_m = rmd_m["md"]
+                    idx_d = np.where(
+                        np.logical_and(date_rmd_d >= date_s,
+                                       date_rmd_d <= date_e))
+                    idx_m = np.where(
+                        np.logical_and(
+                            date_rmd_m >= pb_time.ymd2date(ymd_s[:6] + '01'),
+                            date_rmd_m <= date_e))
+
+                    reference_list = plt_cfg[each]['reference'][i]
+                    for ref_temp in reference_list:
+                        # ref_temp_f = float(ref_temp)
+                        if isLaunch:
+                            pic_path = os.path.join(OMB_DIR, pair,
+                                                    '%s_RMD_%s_%s_Launch_%d.png' % (
+                                                        pair, chan, DayOrNight,
+                                                        ref_temp*100))
+                        else:
+                            # plot latest year
+                            pic_path = os.path.join(OMB_DIR, pair, ymd_e,
+                                                    '%s_RMD_%s_%s_Year_%s_%d.png' % (
+                                                        pair, chan, DayOrNight,
+                                                        ymd_e,
+                                                        ref_temp*100))
+                        title = 'Time Series of REF Relative Bias \n{} Minus {} {} {} REF={}'.format(
+                            part1, part2, chan, DayOrNight, ref_temp)
+                        plot_rmd(
+                            date_rmd_d[idx_d], data_rmd_d[idx_d], date_rmd_m[idx_m], data_rmd_m[idx_m],
+                            pic_path, title, date_s, date_e, sat1,
+                            xname, xname_l, xunit,
+                            yname, yname_l, yunit,
+                            ref_temp,
+                        )
+
                 # plot TBBias ------------------------
-                if xname != 'tbb' or yname != 'tbb':
-                    continue
+                if xname == 'tbb' and yname == 'tbb':
+                    reference_list = plt_cfg[each]['reference'][i]
+                    for ref_temp in reference_list:
+                        ref_temp_f = float(ref_temp)
 
-                reference_list = plt_cfg[each]['reference'][i]
-                for ref_temp in reference_list:
-                    ref_temp_f = float(ref_temp)
+                        bias_D = ref_temp_f - (ref_temp_f * a_D + b_D)
+                        bias_M = ref_temp_f - (ref_temp_f * a_M + b_M)
 
-                    # plot since launch
-    #                 bias_D = ref_temp_f - np.divide((ref_temp_f - b_D), a_D)
-    #                 bias_M = ref_temp_f - np.divide((ref_temp_f - b_M), a_M)
-                    # 20161122 change to FY2 - IASI
-                    bias_D = ref_temp_f - (ref_temp_f * a_D + b_D)
-                    bias_M = ref_temp_f - (ref_temp_f * a_M + b_M)
+                        title = 'Time Series of Brightness Temperature Bias \n%s Minus %s %s %s %sK' % \
+                                (part1, part2, chan, DayOrNight, ref_temp)
+                        if isLaunch:
+                            picPath = os.path.join(OMB_DIR, pair,
+                                               '%s_TBBias_%s_%s_Launch_%dK.png' % (pair, chan, DayOrNight, ref_temp))
+                        else:
+                            # plot latest year
+                            picPath = os.path.join(OMB_DIR, pair, ymd_e,
+                                                   '%s_TBBias_%s_%s_Year_%s_%dK.png' % (pair, chan, DayOrNight, ymd_e, ref_temp))
+                        plot_tbbias(date_D[idx_D], bias_D[idx_D],
+                                    date_M[idx_M], bias_M[idx_M],
+                                    picPath, title,
+                                    date_s, date_e, sat1)
 
-                    title = 'Time Series of Brightness Temperature Bias \n%s Minus %s %s %s %sK' % \
-                            (part1, part2, chan, DayOrNight, ref_temp)
+                    # plot interpolated TBBias img (obs minus backgroud) -------------
+                    title = 'Brightness Temperature Correction\n%s  %s  %s' % \
+                             (pair, chan, DayOrNight)
+
                     if isLaunch:
                         picPath = os.path.join(OMB_DIR, pair,
-                                           '%s_TBBias_%s_%s_Launch_%dK.png' % (pair, chan, DayOrNight, ref_temp))
+                                               '%s_TBBOMB_%s_%s_Launch.png' % (pair, chan, DayOrNight))
                     else:
-                        # plot latest year
                         picPath = os.path.join(OMB_DIR, pair, ymd_e,
-                                               '%s_TBBias_%s_%s_Year_%s_%dK.png' % (pair, chan, DayOrNight, ymd_e, ref_temp))
-                    plot_tbbias(date_D[idx_D], bias_D[idx_D],
-                                date_M[idx_M], bias_M[idx_M],
-                                picPath, title,
-                                date_s, date_e, sat1)
-
-                # plot interpolated TBBias img (obs minus backgroud) -------------
-                title = 'Brightness Temperature Correction\n%s  %s  %s' % \
-                        (pair, chan, DayOrNight)
-
-                if isLaunch:
-                    picPath = os.path.join(OMB_DIR, pair,
-                                           '%s_TBBOMB_%s_%s_Launch.png' % (pair, chan, DayOrNight))
-                else:
-                    picPath = os.path.join(OMB_DIR, pair, ymd_e,
-                              '%s_TBBOMB_%s_%s_Year_%s.png' % (pair, chan, DayOrNight, ymd_e))
-                plot_omb(date_D[idx_D], a_D[idx_D], b_D[idx_D],
-                         picPath, title, date_s, date_e)
+                                  '%s_TBBOMB_%s_%s_Year_%s.png' % (pair, chan, DayOrNight, ymd_e))
+                    plot_omb(date_D[idx_D], a_D[idx_D], b_D[idx_D],
+                             picPath, title, date_s, date_e)
 
 
-def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title,
-                date_s, date_e, satName):
+def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, satName):
     """
     画偏差时序折线图
     """
-    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
-    fig = plt.figure(figsize=(6, 4))
-#     plt.subplots_adjust(left=0.13, right=0.95, bottom=0.11, top=0.97)
-
     if (np.isnan(bias_D)).all():
         Log.error('Everything is NaN: %s' % picPath)
         return
 
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    fig = plt.figure(figsize=(6, 4))
+#     plt.subplots_adjust(left=0.13, right=0.95, bottom=0.11, top=0.97)
+
     plt.plot(date_D, bias_D, 'x', ms=6,
              markerfacecolor=None, markeredgecolor=BLUE, alpha=0.8,
              mew=0.3, label='Daily')
+
     plt.plot(date_M, bias_M, 'o-', ms=5, lw=0.6, c=RED,
              mew=0, label='Monthly')
 
@@ -289,7 +361,6 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title,
 
     xlim_min = pb_time.ymd2date('%04d%02d01' % (date_s.year, date_s.month))
     xlim_max = date_e
-    plt.plot([xlim_min, xlim_max], [0, 0], 'k')  # 在 y = 0 绘制一条黑色直线
     plt.xlim(xlim_min, xlim_max)
     if "FY2" in satName:
         plt.ylim(-8, 8)
@@ -297,6 +368,10 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title,
         plt.ylim(-4, 4)
     elif "FY4" in satName:
         plt.ylim(-2, 2)
+
+    # 画 y=0 线
+    plt.plot([xlim_min, xlim_max], [0, 0], color='#808080',
+             linewidth=1.0)
 
     ax = plt.gca()
     # format the ticks
@@ -329,6 +404,102 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title,
     #---------------
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     plt.savefig(picPath)
+    fig.clear()
+    plt.close()
+
+
+def plot_rmd(date_d, data_d, date_m, data_m, pic_path, title, date_s, date_e, sat_name,
+             xname, xname_l, xunit,
+             yname, yname_l, yunit,
+             ref_temp,
+             ):
+    if (np.isnan(data_d)).all():
+        Log.error('Everything is NaN: %s' % pic_path)
+        return
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    fig = plt.figure(figsize=(6, 4))
+    fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
+
+    ax1 = plt.subplot2grid((1, 1), (0, 0))
+
+    title = title
+
+    # plot timeseries --------------------------------------------------------
+    timeseries_xmin = pb_time.ymd2date(
+        '%04d%02d01' % (date_s.year, date_s.month))
+    timeseries_xmax = date_e
+
+    if "FY2" in sat_name:
+        timeseries_ymin = -8
+        timeseries_ymax = 8
+    elif "FY3" in sat_name:
+        timeseries_ymin = -20
+        timeseries_ymax = 20
+    elif "FY4" in sat_name:
+        timeseries_ymin = -2
+        timeseries_ymax = 2
+    else:
+        timeseries_ymin = None
+        timeseries_ymax = None
+    timeseries_axislimit = {
+        "xlimit": (timeseries_xmin, timeseries_xmax),
+        "ylimit": (timeseries_ymin, timeseries_ymax),
+    }
+
+    # x y 轴标签
+    timeseries_label = {}
+    if xunit != "":
+        ylabel = 'D{}({})'.format(xname_l, xunit)
+    else:
+        ylabel = "Relative Bias {:d} %".format(int(ref_temp * 100))
+    timeseries_label["ylabel"] = ylabel
+
+    timeseries_locator = {"locator_x": (None, None), "locator_y": (8, 2)}
+
+    # y=0 线配置
+    timeseries_zeroline = {"line_color": '#808080', "line_width": 1.0}
+
+    timeseries_daily = {
+        "marker": 'x', "color": BLUE, "linewidth": None,
+        "markersize": 6, "markerfacecolor": None, "markeredgecolor": BLUE,
+        "alpha": 0.8, "markeredgewidth": 0.3, "label": "Daily",
+    }
+    dv_pub_3d.draw_timeseries(
+        ax1, date_d, data_d, label=timeseries_label,
+        axislimit=timeseries_axislimit, locator=timeseries_locator,
+        zeroline=timeseries_zeroline, timeseries=timeseries_daily,
+    )
+    timeseries_monthly = {
+        "marker": 'o-', "color": RED, "linewidth": 0.6,
+        "markersize": 5, "markerfacecolor": None, "markeredgecolor": RED,
+        "alpha": 0.8, "markeredgewidth": 0, "label": "Monthly",
+    }
+    dv_pub_3d.draw_timeseries(
+        ax1, date_m, data_m, label=timeseries_label,
+        axislimit=timeseries_axislimit, locator=timeseries_locator,
+        zeroline=timeseries_zeroline, timeseries=timeseries_monthly,
+    )
+    # --------------------
+    fig.suptitle(title, fontsize=11, fontproperties=FONT0)
+    fig.subplots_adjust(bottom=0.2)
+
+    circle1 = mpatches.Circle((74, 15), 6, color=BLUE, ec=EDGE_GRAY, lw=0)
+    circle2 = mpatches.Circle((164, 15), 6, color=RED, ec=EDGE_GRAY, lw=0)
+    fig.patches.extend([circle1, circle2])
+
+    fig.text(0.15, 0.02, 'Daily', color=BLUE, fontproperties=FONT0)
+    fig.text(0.3, 0.02, 'Monthly', color=RED, fontproperties=FONT0)
+
+    ymd_s, ymd_e = date_s.strftime('%Y%m%d'), date_e.strftime('%Y%m%d')
+    if ymd_s != ymd_e:
+        fig.text(0.50, 0.02, '%s-%s' % (ymd_s, ymd_e), fontproperties=FONT0)
+    else:
+        fig.text(0.50, 0.02, '%s' % ymd_s, fontproperties=FONT0)
+
+    fig.text(0.8, 0.02, ORG_NAME, fontproperties=FONT0)
+    # ---------------
+    pb_io.make_sure_path_exists(os.path.dirname(pic_path))
+    plt.savefig(pic_path)
     fig.clear()
     plt.close()
 
@@ -396,7 +567,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
              date_s, date_e,
              slope_min, slope_max,
              var):
-    plt.style.use(os.path.join(dvPath, 'dv_pub_legacy.mplstyle'))
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 6))
     ax1 = plt.subplot(311)
     ax2 = plt.subplot(312, sharex=ax1)
@@ -512,15 +683,16 @@ def plot_abc(date_D, a_D, b_D, c_D,
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     fig.savefig(picPath)
     plt.close()
-    fig.clear
+    fig.clear()
 
 
 def plot_omb(date_D, a_D, b_D,
              picPath, title,
              date_s, date_e):
-    '''
+    """
     画偏差时序彩色图
-    '''
+    """
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
     if (np.isnan(a_D)).all():
         Log.error('Everything is NaN: %s' % picPath)
         return
@@ -571,7 +743,7 @@ def plot_omb(date_D, a_D, b_D,
     plt.title(title, fontsize=12, fontproperties=FONT0)
 
     plt.tight_layout()
-    #--------------------
+    # --------------------
     fig.subplots_adjust(bottom=0.25)
 
     # -------add colorbar ---------
@@ -597,12 +769,13 @@ def plot_omb(date_D, a_D, b_D,
         fig.text(0.52, 0.05, '%s' % ymd_s, fontproperties=FONT0)
 
     fig.text(0.82, 0.05, ORG_NAME, fontproperties=FONT0)
-    #---------------
+    # ---------------
 
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     plt.savefig(picPath)
     fig.clear()
     plt.close()
+
 
 ######################### 程序全局入口 ##############################
 # 获取程序参数接口
