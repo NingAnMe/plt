@@ -1,29 +1,30 @@
 # coding: utf-8
-'''
+"""
 Created on 2016年1月6日
 读取匹配后的 HDF5 文件，画散点回归图，生成 abr 文件
 
 @author: duxiang, zhangtao, anning
-'''
-import os, sys, calendar
-from PB.pb_time import get_local_time
+"""
+import calendar
+import os
+import sys
+from datetime import datetime
+from multiprocessing import Pool, Lock
+
+import numpy as np
 
 from configobj import ConfigObj
 from dateutil.relativedelta import relativedelta
 from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
-import numpy as np
 
-from PB import pb_time, pb_io
-from PB.CSC.pb_csc_console import LogServer
 from DV import dv_pub_3d
-from DV.dv_pub_3d import FONT0, bias_information, day_data_write, draw_distribution
-from multiprocessing import Pool, Lock
-from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-from datetime import datetime
+from DV.dv_pub_3d import FONT0, bias_information, day_data_write, plt
+from DM.SNO.dm_sno_cross_calc_map import BLUE
+from PB.CSC.pb_csc_console import LogServer
+from PB.pb_time import get_local_time
+from PB import pb_time, pb_io
 from plt_io import ReadHDF5, loadYamlCfg
 
 lock = Lock()
@@ -51,7 +52,9 @@ def run(pair, ymd, isMonthly):
     if plt_cfg is None:
         return
 
-    Log.info(u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(pair, ymd))
+    Log.info(
+        u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(
+            pair, ymd))
 
     for each in plt_cfg['regression']:
         dict_cabr = {}
@@ -82,14 +85,16 @@ def run(pair, ymd, isMonthly):
             num_file = PERIOD
             for daydelta in xrange(PERIOD):
                 cur_ymd = pb_time.ymd_plus(ymd, -daydelta)
-                hdf5_name = 'COLLOC+%sIR,%s_C_BABJ_%s.hdf5' % (Type, pair, cur_ymd)
+                hdf5_name = 'COLLOC+%sIR,%s_C_BABJ_%s.hdf5' % (
+                    Type, pair, cur_ymd)
                 filefullpath = os.path.join(MATCH_DIR, pair, hdf5_name)
                 if not os.path.isfile(filefullpath):
                     Log.info(u"File not found: {}".format(filefullpath))
                     num_file -= 1
                     continue
                 if not oneHDF5.LoadData(filefullpath, chan):
-                    Log.error('Error occur when reading %s of %s' % (chan, filefullpath))
+                    Log.error('Error occur when reading %s of %s' % (
+                        chan, filefullpath))
             if num_file == 0:
                 Log.error(u"No file found.")
                 continue
@@ -104,26 +109,35 @@ def run(pair, ymd, isMonthly):
                 cur_path = os.path.join(DRA_DIR, pair, str_time)
 
             # delete 0 in std
-            if len(oneHDF5.rad1_std) > 0.0001:  # TODO: 有些极小的std可能是异常值，而导致权重极大，所以 std>0 改成 std>0.0001
+            if len(
+                    oneHDF5.rad1_std) > 0.0001:  # TODO: 有些极小的std可能是异常值，而导致权重极大，所以 std>0 改成 std>0.0001
                 deletezeros = np.where(oneHDF5.rad1_std > 0.0001)
                 oneHDF5.rad1_std = oneHDF5.rad1_std[deletezeros]
-                oneHDF5.rad1 = oneHDF5.rad1[deletezeros] if len(oneHDF5.rad1) > 0 else oneHDF5.rad1
-                oneHDF5.rad2 = oneHDF5.rad2[deletezeros] if len(oneHDF5.rad2) > 0 else oneHDF5.rad2
-                print('chan1', chan, len(oneHDF5.tbb1))
-                oneHDF5.tbb1 = oneHDF5.tbb1[deletezeros] if len(oneHDF5.tbb1) > 0 else oneHDF5.tbb1
-                print('chan1', chan, len(oneHDF5.tbb1))
-                oneHDF5.tbb2 = oneHDF5.tbb2[deletezeros] if len(oneHDF5.tbb2) > 0 else oneHDF5.tbb2
-                oneHDF5.time = oneHDF5.time[deletezeros] if len(oneHDF5.time) > 0 else oneHDF5.time
+                oneHDF5.rad1 = oneHDF5.rad1[deletezeros] if len(
+                    oneHDF5.rad1) > 0 else oneHDF5.rad1
+                oneHDF5.rad2 = oneHDF5.rad2[deletezeros] if len(
+                    oneHDF5.rad2) > 0 else oneHDF5.rad2
+                oneHDF5.tbb1 = oneHDF5.tbb1[deletezeros] if len(
+                    oneHDF5.tbb1) > 0 else oneHDF5.tbb1
+                oneHDF5.tbb2 = oneHDF5.tbb2[deletezeros] if len(
+                    oneHDF5.tbb2) > 0 else oneHDF5.tbb2
+                oneHDF5.time = oneHDF5.time[deletezeros] if len(
+                    oneHDF5.time) > 0 else oneHDF5.time
             if len(oneHDF5.ref1_std) > 0.0001:
                 deletezeros = np.where(oneHDF5.ref1_std > 0.0001)
                 oneHDF5.ref1_std = oneHDF5.ref1_std[deletezeros]
-                oneHDF5.ref1 = oneHDF5.ref1[deletezeros] if len(oneHDF5.ref1) > 0 else oneHDF5.ref1
-                oneHDF5.ref2 = oneHDF5.ref2[deletezeros] if len(oneHDF5.ref2) > 0 else oneHDF5.ref2
-                oneHDF5.dn1 = oneHDF5.dn1[deletezeros] if len(oneHDF5.dn1) > 0 else oneHDF5.dn1
-                oneHDF5.time = oneHDF5.time[deletezeros] if len(oneHDF5.time) > 0 else oneHDF5.time
+                oneHDF5.ref1 = oneHDF5.ref1[deletezeros] if len(
+                    oneHDF5.ref1) > 0 else oneHDF5.ref1
+                oneHDF5.ref2 = oneHDF5.ref2[deletezeros] if len(
+                    oneHDF5.ref2) > 0 else oneHDF5.ref2
+                oneHDF5.dn1 = oneHDF5.dn1[deletezeros] if len(
+                    oneHDF5.dn1) > 0 else oneHDF5.dn1
+                oneHDF5.time = oneHDF5.time[deletezeros] if len(
+                    oneHDF5.time) > 0 else oneHDF5.time
 
             # find out day and night
-            if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
+            if ('day' in Day_Night or 'night' in Day_Night) and len(
+                    oneHDF5.time) > 0:
                 jd = oneHDF5.time / 24. / 3600.  # jday from 1993/01/01 00:00:00
                 hour = ((jd - jd.astype('int8')) * 24).astype('int8')
                 day_index = (hour < 10)  # utc hour<10 is day
@@ -131,7 +145,7 @@ def run(pair, ymd, isMonthly):
             else:
                 day_index = None
                 night_index = None
-            print('3')
+
             # 将每个对通用的属性值放到对循环，每个通道用到的属性值放到通道循环
             # get threhold, unit, names...
             xname, yname = each.split('-')
@@ -211,16 +225,18 @@ def run(pair, ymd, isMonthly):
                     dict_cabr_n[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_md_n[xname][chan] = np.NaN
                 continue
-            print('2')
+
             # regression starts
             if 'all' in Day_Night:
                 o_file = os.path.join(cur_path,
-                                      '%s_%s_%s_ALL_%s' % (pair, o_name, chan, str_time))
+                                      '%s_%s_%s_ALL_%s' % (
+                                          pair, o_name, chan, str_time))
+                print('x_all, y_all', len(x), len(y))
                 abr, bias = plot(x, y, weight, o_file,
-                           num_file, part1, part2, chan, str_time,
-                           xname, xname_l, xunit, xmin, xmax,
-                           yname, yname_l, yunit, ymin, ymax,
-                           diagonal, isMonthly)
+                                 num_file, part1, part2, chan, str_time,
+                                 xname, xname_l, xunit, xmin, xmax,
+                                 yname, yname_l, yunit, ymin, ymax,
+                                 diagonal, isMonthly)
                 if abr:
                     dict_cabr[o_name][chan] = abr
                 else:
@@ -229,29 +245,23 @@ def run(pair, ymd, isMonthly):
                     dict_md[xname][chan] = bias
                 else:
                     dict_md[xname][chan] = np.NaN
-            print('4')
-            print(each, chan)
+
             # ------- day ----------
             if 'day' in Day_Night:
-                print('10')
                 if day_index is not None and np.where(day_index)[0].size > 10:
-                    print('11')
                     o_file = os.path.join(cur_path,
-                                          '%s_%s_%s_Day_%s' % (pair, o_name, chan, str_time))
-                    print('6')
-                    print('x, y, day_all', len(x), len(y), len(day_index))
+                                          '%s_%s_%s_Day_%s' % (
+                                              pair, o_name, chan, str_time))
                     x_d = x[day_index]
                     y_d = y[day_index]
-                    print('8')
                     w_d = weight[day_index] if weight is not None else None
-                    print('9')
-                    print('x, y, day_index', len(x_d), len(y_d), len(day_index))
+                    print('x, y', len(x), len(y))
+                    print('x_day, y_day', len(x_d), len(y_d))
                     abr, bias = plot(x_d, y_d, w_d, o_file,
-                               num_file, part1, part2, chan, str_time,
-                               xname, xname_l, xunit, xmin, xmax,
-                               yname, yname_l, yunit, ymin, ymax,
-                               diagonal, isMonthly)
-                    print('7')
+                                     num_file, part1, part2, chan, str_time,
+                                     xname, xname_l, xunit, xmin, xmax,
+                                     yname, yname_l, yunit, ymin, ymax,
+                                     diagonal, isMonthly)
                     if abr:
                         dict_cabr_d[o_name][chan] = abr
                     else:
@@ -263,21 +273,21 @@ def run(pair, ymd, isMonthly):
                 else:
                     dict_cabr_d[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_md_d[xname][chan] = np.NaN
-            print('5')
             # ---------night ------------
             if 'night' in Day_Night:
                 if night_index is not None and np.where(night_index)[0].size > 10:
                     o_file = os.path.join(cur_path, '%s_%s_%s_Night_%s' % (
                         pair, o_name, chan, str_time))
-
                     x_n = x[night_index]
                     y_n = y[night_index]
                     w_n = weight[night_index] if weight is not None else None
+                    print('x, y', len(x), len(y))
+                    print('x_night, y_night', len(x_n), len(y_n))
                     abr, bias = plot(x_n, y_n, w_n, o_file,
-                               num_file, part1, part2, chan, str_time,
-                               xname, xname_l, xunit, xmin, xmax,
-                               yname, yname_l, yunit, ymin, ymax,
-                               diagonal, isMonthly)
+                                     num_file, part1, part2, chan, str_time,
+                                     xname, xname_l, xunit, xmin, xmax,
+                                     yname, yname_l, yunit, ymin, ymax,
+                                     diagonal, isMonthly)
                     if abr:
                         dict_cabr_n[o_name][chan] = abr
                     else:
@@ -290,7 +300,7 @@ def run(pair, ymd, isMonthly):
                     dict_cabr_n[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_md_n[xname][chan] = np.NaN
             oneHDF5.clear()
-        print('1')
+
         # write txt
         lock.acquire()
         channel = plt_cfg[each]['chan']
@@ -299,34 +309,33 @@ def run(pair, ymd, isMonthly):
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr,
                          'ALL', isMonthly)
                 write_md(channel, part1, part2, xname, ymd,
-                         dict_md, 'ALL', isMonthly)
+                         dict_md, 'ALL')
         if 'day' in Day_Night:
             for o_name in dict_cabr_d:
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_d,
                          'Day', isMonthly)
                 write_md(channel, part1, part2, xname, ymd,
-                         dict_md_d, 'Day', isMonthly)
+                         dict_md_d, 'Day')
         if 'night' in Day_Night:
             for o_name in dict_cabr_n:
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_n,
                          'Night', isMonthly)
                 write_md(channel, part1, part2, xname, ymd,
-                         dict_md_n, 'Night', isMonthly)
+                         dict_md_n, 'Night')
         lock.release()
 
 
 def write_md(channel, part1, part2, xname, ymd,
-             dict_md, day_or_night, is_monthly):
+             dict_md, day_or_night):
     """
     生成 RMD 文件
     :param channel:
     :param part1:
     :param part2:
-    :param o_name:
+    :param xname:
     :param ymd:
-    :param data:
-    :param DayOrNight:
-    :param isMonthly:
+    :param dict_md:
+    :param day_or_night:
     :return:
     """
     if not (xname in ["ref", "tbb"]):
@@ -380,7 +389,8 @@ def month_average(day_data):
     month_datas = []
     ymd_start = day_data['date'][0]  # 第一天日期
     ymd_end = day_data['date'][-1]  # 最后一天日期
-    date_start = ymd_start - relativedelta(days=(ymd_start.day - 1))  # 第一个月第一天日期
+    date_start = ymd_start - relativedelta(
+        days=(ymd_start.day - 1))  # 第一个月第一天日期
 
     while date_start <= ymd_end:
         # 当月最后一天日期
@@ -417,16 +427,20 @@ def writeTxt(channel, part1, part2, o_name, ymd,
         ymd = ymd + '01'
     if isMonthly:
         FileName = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
-                                '%s_%s_%s_%s_Monthly.txt' % (part1, part2, o_name, DayOrNight))
+                                '%s_%s_%s_%s_Monthly.txt' % (
+                                part1, part2, o_name, DayOrNight))
     else:
         FileName = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
-                                '%s_%s_%s_%s_%s.txt' % (part1, part2, o_name, DayOrNight, ymd[:4]))
+                                '%s_%s_%s_%s_%s.txt' % (
+                                part1, part2, o_name, DayOrNight, ymd[:4]))
 
     title_line = 'YMD       '
     newline = ''
     for chan in channel:
-        title_line = title_line + '  Count(%s) Slope(%s) Intercept(%s) RSquared(%s)' % (chan, chan, chan, chan)
-        newline = newline + '  %10d  %-10.6f  %-10.6f  %-10.6f' % (tuple(dict_cabr[o_name][chan]))
+        title_line = title_line + '  Count(%s) Slope(%s) Intercept(%s) RSquared(%s)' % (
+            chan, chan, chan, chan)
+        newline = newline + '  %10d  %-10.6f  %-10.6f  %-10.6f' % (
+            tuple(dict_cabr[o_name][chan]))
     newline = newline + '\n'  # don't forget to end with \n
 
     allLines = []
@@ -445,7 +459,8 @@ def writeTxt(channel, part1, part2, o_name, ymd,
         titleLines.append('TimeRange: %s\n' % ymd[:4])
         titleLines.append('           Daily\n')
     titleLines.append('Day or Night: %s\n' % DayOrNight)
-    titleLines.append('Calc time : %s\n' % get_local_time().strftime('%Y.%m.%d %H:%M:%S'))
+    titleLines.append(
+        'Calc time : %s\n' % get_local_time().strftime('%Y.%m.%d %H:%M:%S'))
     titleLines.append('\n')
     titleLines.append('\n')
     titleLines.append(title_line + '\n')
@@ -464,7 +479,8 @@ def writeTxt(channel, part1, part2, o_name, ymd,
         # 添加或更改数据
         DICT_TXT[ymd] = newline
         # 按照时间排序
-        newLines = sorted(DICT_TXT.iteritems(), key=lambda d: d[0], reverse=False)
+        newLines = sorted(DICT_TXT.iteritems(), key=lambda d: d[0],
+                          reverse=False)
 
         for i in xrange(len(newLines)):
             allLines.append(str(newLines[i][0]) + str(newLines[i][1]))
@@ -481,7 +497,6 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
          xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax,
          is_diagonal, isMonthly):
     plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
-    print 'right 1'
 
     # 过滤 正负 delta+8倍std 的杂点 ------------------------
     w = 1.0 / weight if weight is not None else None
@@ -500,7 +515,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     # -----------------------------------------
     RadCompare = G_reg1d(x, y, w)
     length_rad = len(x)
-    print 'right 2'
+
     bias = None  # 当 bias 没有被计算的时候，不输出 bias
     if not isMonthly and is_diagonal:
         # return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]
@@ -540,15 +555,19 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         }
 
         if xname == "tbb":
-            regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+            regress_locator = {"locator_x": (None, None),
+                               "locator_y": (None, 5)}
         elif xname == "ref":
-            regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+            regress_locator = {"locator_x": (None, None),
+                               "locator_y": (None, 5)}
+        else:
+            regress_locator = None
 
         regress_annotate = {
-                "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
-                         '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
-                         '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
-                         '{:15}: {:7d}'.format('Number', length_rad)]
+            "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
+                     '{:15}: {:7.4f}'.format('Intercept', RadCompare[1]),
+                     '{:15}: {:7.4f}'.format('Cor-Coef', RadCompare[4]),
+                     '{:15}: {:7d}'.format('Number', length_rad)]
         }
 
         regress_diagonal = {"line_color": '#808080', "line_width": 1.2}
@@ -618,6 +637,8 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             distri_locator = {"locator_x": (None, None), "locator_y": (8, 5)}
         elif xname == 'ref':
             distri_locator = {"locator_x": (None, None), "locator_y": (8, 5)}
+        else:
+            distri_locator = None
 
         # y=0 线配置
         zeroline = {"line_color": '#808080', "line_width": 1.0}
@@ -631,7 +652,6 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         # 偏差回归线配置
         regressline = {"line_color": 'r', "line_width": 1.2}
-        print "ddddd1"
         dv_pub_3d.draw_distribution(ax2, x, y, label=distri_label,
                                     ax_annotate=distri_annotate,
                                     axislimit=distri_limit,
@@ -656,9 +676,13 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         # 添加间隔数量
         if xname == "tbb":
-            histogram_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+            histogram_locator = {"locator_x": (None, None),
+                                 "locator_y": (None, 5)}
         elif xname == "ref":
-            histogram_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+            histogram_locator = {"locator_x": (None, None),
+                                 "locator_y": (None, 5)}
+        else:
+            histogram_locator = None
 
         histogram_x = {
             "label": part1, "color": "red", "alpha": 0.4, "bins": 100
@@ -676,7 +700,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             ax3, y, label=histogram_label, locator=histogram_locator,
             axislimit=histogram_axislimit, histogram=histogram_y,
         )
-        print 'right 4'
+
     elif not isMonthly and not is_diagonal:
         fig = plt.figure(figsize=(4.5, 4.5))
         fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
@@ -713,10 +737,13 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         if xname == "tbb":
             regress_locator = {"locator_x": (5, None), "locator_y": (5, 5)}
         elif xname == "ref":
-            regress_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
+            regress_locator = {"locator_x": (None, None),
+                               "locator_y": (None, 5)}
         elif xname == "dn":
             regress_locator = {"locator_x": (5, None),
                                "locator_y": (None, 5)}
+        else:
+            regress_locator = None
 
         regress_annotate = {
             "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
@@ -775,10 +802,13 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         if xname == "tbb":
             density_locator = {"locator_x": (5, None), "locator_y": (5, 5)}
         elif xname == "ref":
-            density_locator = {"locator_x": (None, None), "locator_y": (None, 5)}
-        if xname == "dn":
+            density_locator = {"locator_x": (None, None),
+                               "locator_y": (None, 5)}
+        elif xname == "dn":
             density_locator = {"locator_x": (5, None),
                                "locator_y": (None, 5)}
+        else:
+            density_locator = None
 
         density_annotate = {
             "left": ['{:15}: {:7.4f}'.format('Slope', RadCompare[0]),
@@ -801,10 +831,9 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             density=density,
         )
     else:
-        print 'No output Pic {} : '.format(ymd)
+        print '::::::No output Pic {} : '.format(ymd)
         return
 
-    print 'right 3'
     fig.suptitle(title, fontsize=11, fontproperties=FONT0)
     pb_io.make_sure_path_exists(os.path.dirname(o_file))
     fig.savefig(o_file, dpi=100)
@@ -812,7 +841,8 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     fig.clear()
     plt.close()
 
-    return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]], bias  # num, a, b, r, md
+    return [len(x), RadCompare[0], RadCompare[1],
+            RadCompare[4]], bias  # num, a, b, r, md
 
 
 def G_reg1d(xx, yy, ww=None):
@@ -833,91 +863,94 @@ def G_reg1d(xx, yy, ww=None):
 
 
 ######################### 程序全局入口 ##############################
-
-# 获取程序参数接口
-args = sys.argv[1:]
-help_info = \
-    u'''
-    [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
-    [参数样例2]：处理所有卫星对
-    '''
-if '-h' in args:
-    print help_info
-    sys.exit(-1)
-
-# 获取程序所在位置，拼接配置文件
-MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-ProjPath = os.path.dirname(MainPath)
-omPath = os.path.dirname(ProjPath)
-dvPath = os.path.join(os.path.dirname(omPath), 'DV')
-cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
-
-# 配置不存在预警
-if not os.path.isfile(cfgFile):
-    print (u'配置文件不存在 %s' % cfgFile)
-    sys.exit(-1)
-
-# 载入配置文件
-inCfg = ConfigObj(cfgFile)
-MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
-DRA_DIR = inCfg['PATH']['OUT']['DRA']
-MRA_DIR = inCfg['PATH']['OUT']['MRA']
-ABR_DIR = inCfg['PATH']['OUT']['ABR']
-LogPath = inCfg['PATH']['OUT']['LOG']
-Log = LogServer(LogPath)
-
-# 开启进程池
-threadNum = inCfg['CROND']['threads']
-pool = Pool(processes=int(threadNum))
-
-if len(args) == 2:
-    Log.info(u'手动日月回归分析程序开始运行-----------------------------')
-    satPair = args[0]
-    str_time = args[1]
-    date_s, date_e = pb_time.arg_str2date(str_time)
-    isMonthly = False
-    if len(str_time) == 13:
-        isMonthly = True
-        timeStep = relativedelta(months=1)
-    elif len(str_time) == 17:
-        timeStep = relativedelta(days=1)
-    else:
-        print 'time format error  yyyymmdd-yyyymmdd or yyyymm-yyyymm'
+if __name__ == "__main__":
+    # 获取程序参数接口
+    args = sys.argv[1:]
+    help_info = \
+        u'''
+        [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
+        [参数样例2]：处理所有卫星对
+        '''
+    if '-h' in args:
+        print help_info
         sys.exit(-1)
-    # 定义参数List，传参给线程池
-    args_List = []
 
-    while date_s <= date_e:
-        ymd = date_s.strftime('%Y%m%d')
-        run(satPair, ymd, isMonthly)
-        # pool.apply_async(run, (satPair, ymd, isMonthly))
-        date_s = date_s + timeStep
+    # 获取程序所在位置，拼接配置文件
+    MainPath, MainFile = os.path.split(os.path.realpath(__file__))
+    ProjPath = os.path.dirname(MainPath)
+    omPath = os.path.dirname(ProjPath)
+    dvPath = os.path.join(os.path.dirname(omPath), 'DV')
+    cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 
-    pool.close()
-    pool.join()
+    # 配置不存在预警
+    if not os.path.isfile(cfgFile):
+        print (u'配置文件不存在 %s' % cfgFile)
+        sys.exit(-1)
 
-elif len(args) == 0:
-    Log.info(u'自动日月回归分析程序开始运行 -----------------------------')
-    rolldays = inCfg['CROND']['rolldays']
-    pairLst = inCfg['PAIRS'].keys()
+    # 载入配置文件
+    inCfg = ConfigObj(cfgFile)
+    MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
+    DRA_DIR = inCfg['PATH']['OUT']['DRA']
+    MRA_DIR = inCfg['PATH']['OUT']['MRA']
+    ABR_DIR = inCfg['PATH']['OUT']['ABR']
+    LogPath = inCfg['PATH']['OUT']['LOG']
+    Log = LogServer(LogPath)
 
-    for satPair in pairLst:
-        ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
-        if ProjMode1 == 0:
-            continue
-        for rdays in rolldays:
-            isMonthly = False
-            ymd = (datetime.utcnow() - relativedelta(days=int(rdays))).strftime('%Y%m%d')
+    # 开启进程池
+    threadNum = inCfg['CROND']['threads']
+    pool = Pool(processes=int(threadNum))
+
+    if len(args) == 2:
+        Log.info(u'手动日月回归分析程序开始运行-----------------------------')
+        satPair = args[0]
+        str_time = args[1]
+        date_s, date_e = pb_time.arg_str2date(str_time)
+        isMonthly = False
+        if len(str_time) == 13:
+            isMonthly = True
+            timeStep = relativedelta(months=1)
+        elif len(str_time) == 17:
+            timeStep = relativedelta(days=1)
+        else:
+            print 'time format error  yyyymmdd-yyyymmdd or yyyymm-yyyymm'
+            sys.exit(-1)
+        # 定义参数List，传参给线程池
+        args_List = []
+
+        while date_s <= date_e:
+            ymd = date_s.strftime('%Y%m%d')
+            run(satPair, ymd, isMonthly)
+            # pool.apply_async(run, (satPair, ymd, isMonthly))
+            date_s = date_s + timeStep
+
+        pool.close()
+        pool.join()
+
+    elif len(args) == 0:
+        Log.info(u'自动日月回归分析程序开始运行 -----------------------------')
+        rolldays = inCfg['CROND']['rolldays']
+        pairLst = inCfg['PAIRS'].keys()
+
+        for satPair in pairLst:
+            ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
+            if ProjMode1 == 0:
+                continue
+            for rdays in rolldays:
+                isMonthly = False
+                ymd = (datetime.utcnow() - relativedelta(
+                    days=int(rdays))).strftime('%Y%m%d')
+                pool.apply_async(run, (satPair, ymd, isMonthly))
+            # 增加一个月的作业,默认当前月和上一个月
+            isMonthly = True
+            ymd = (datetime.utcnow() - relativedelta(
+                days=int(rolldays[0]))).strftime('%Y%m%d')
+            ymdLast = (datetime.utcnow() - relativedelta(months=1)).strftime(
+                '%Y%m%d')
             pool.apply_async(run, (satPair, ymd, isMonthly))
-        # 增加一个月的作业,默认当前月和上一个月
-        isMonthly = True
-        ymd = (datetime.utcnow() - relativedelta(days=int(rolldays[0]))).strftime('%Y%m%d')
-        ymdLast = (datetime.utcnow() - relativedelta(months=1)).strftime('%Y%m%d')
-        pool.apply_async(run, (satPair, ymd, isMonthly))
-        pool.apply_async(run, (satPair, ymdLast, isMonthly))
+            pool.apply_async(run, (satPair, ymdLast, isMonthly))
 
-    pool.close()
-    pool.join()
-else:
-    print 'args: error'
-    sys.exit(-1)
+        pool.close()
+        pool.join()
+    else:
+        print 'args: error'
+        sys.exit(-1)
