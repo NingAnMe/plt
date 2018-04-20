@@ -345,6 +345,97 @@ def run(pair, date_s, date_e):
                              picPath, title, date_s, date_e)
 
 
+def plot_omb(date_D, a_D, b_D,
+             picPath, title,
+             date_s, date_e):
+    """
+    画偏差时序彩色图
+    """
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    if (np.isnan(a_D)).all():
+        Log.error('Everything is NaN: %s' % picPath)
+        return
+
+    ylim_min, ylim_max = 210, 330
+    y_res = 0.2
+    x_size = (date_e - date_s).days
+    yy = np.arange(ylim_min, ylim_max, y_res) + y_res / 2.  # 一列的y值
+    grid = np.ones(len(date_D)) * yy.reshape(-1, 1)
+
+    aa = a_D * np.ones((len(grid), 1))
+    bb = b_D * np.ones((len(grid), 1))
+
+    grid = grid - np.divide((grid - bb), aa)
+
+    # zz = np.zeros((len(yy), x_size))  # 2D， 要画的值
+    zz = np.full((len(yy), x_size), -65535)  # 将值填充为 - ，以前填充0
+    zz = np.ma.masked_where(zz == -65535, zz)
+
+    j = 0
+    xx = []  # 一行的x值
+    for i in xrange(x_size):  # 补充缺失数据的天
+        date_i = date_s + relativedelta(days=i)
+        xx.append(date_i)
+        if j < len(date_D) and date_D[j] == date_i:
+            zz[:, i] = grid[:, j]
+            j = j + 1
+
+    fig = plt.figure(figsize=(6, 4))
+    ax = fig.add_subplot(111)
+
+    norm = mpl.colors.Normalize(vmin=-4.0, vmax=4.0)
+    xx = np.array(xx)
+    plt.pcolormesh(xx, yy, zz, cmap='jet', norm=norm, shading='flat', zorder=0)
+    plt.grid(True, zorder=10)
+
+    xlim_min = date_s
+    xlim_max = date_e
+    plt.xlim(xlim_min, xlim_max)
+    plt.ylim(ylim_min, ylim_max)
+    plt.ylabel('TB($K$)', fontsize=11, fontproperties=FONT0)
+
+    # format the ticks
+    setXLocator(ax, xlim_min, xlim_max)
+    set_tick_font(ax)
+
+    # title
+    plt.title(title, fontsize=12, fontproperties=FONT0)
+
+    plt.tight_layout()
+    # --------------------
+    fig.subplots_adjust(bottom=0.25)
+
+    # -------add colorbar ---------
+    fig.canvas.draw()
+    point_bl = ax.get_position().get_points()[0]  # 左下
+    point_tr = ax.get_position().get_points()[1]  # 右上
+    cbar_height = 0.05
+    colorbar_ax = fig.add_axes([point_bl[0] - 0.05, 0.05,
+                                (point_tr[0] - point_bl[0]) / 2.2, cbar_height])
+
+    mpl.colorbar.ColorbarBase(colorbar_ax, cmap='jet',
+                               norm=norm,
+                               orientation='horizontal')
+    # ---font of colorbar-----------
+    for l in colorbar_ax.xaxis.get_ticklabels():
+        l.set_fontproperties(FONT0)
+        l.set_fontsize(9)
+    # ------Time and ORG_NAME----------------
+    ymd_s, ymd_e = date_s.strftime('%Y%m%d'), date_e.strftime('%Y%m%d')
+    if ymd_s != ymd_e:
+        fig.text(0.52, 0.05, '%s-%s' % (ymd_s, ymd_e), fontproperties=FONT0)
+    else:
+        fig.text(0.52, 0.05, '%s' % ymd_s, fontproperties=FONT0)
+
+    fig.text(0.82, 0.05, ORG_NAME, fontproperties=FONT0)
+    # ---------------
+
+    pb_io.make_sure_path_exists(os.path.dirname(picPath))
+    plt.savefig(picPath)
+    fig.clear()
+    plt.close()
+
+
 def plot_tbbias(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
                 sat_name, pair, chan, day_or_night, ref_temp,
                 xname, xname_l, xunit,
