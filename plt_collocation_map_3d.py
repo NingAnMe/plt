@@ -46,9 +46,7 @@ def run(pair, ymd):
     PERIOD = plt_cfg['collocation_map']['days']  # 回滚天数
     chans = plt_cfg['collocation_map']['chan']  # 通道
     maptype = plt_cfg['collocation_map']['maptype']  # 需要绘制的类型
-    print('maptype', maptype)
 
-    print('2')
     if 'area' in maptype:  # 区域块视图
         area = plt_cfg['collocation_map']['area']
     else:
@@ -64,7 +62,6 @@ def run(pair, ymd):
         map_range = (polar, area)
         print('map_range:', map_range)
 
-    print('3')
     Log.info(u"----- Start Drawing Matched Map-Pic,"
              u" PAIR: {}, YMD: {}, PERIOD: {} -----".format(pair, ymd, PERIOD))
 
@@ -78,7 +75,6 @@ def run(pair, ymd):
                                                                sensor1, sat2,
                                                                sensor2, cur_ymd)
         filefullpath = os.path.join(MATCH_DIR, pair, filename)
-
         if not os.path.isfile(filefullpath):
             Log.info(u"File not found: {}".format(filefullpath))
             num_file -= 1
@@ -87,19 +83,15 @@ def run(pair, ymd):
         if not oneHDF5.LoadData(filefullpath, chans):
             Log.error('Error occur when reading %s of %s' % (chans,
                                                              filefullpath))
-    print('4')
     if num_file == 0:
         Log.error(u"No file found.")
         return
     elif num_file != PERIOD:
         Log.error(u"{} of {} file(s) found.".format(num_file, PERIOD))
-    print('5')
     cur_path = os.path.join(DMS_DIR, pair, ymd)
 
     o_file = os.path.join(cur_path,
                           '%s_%s_MatchedPoints_ALL_%s' % (part1, part2, ymd))
-    print('6')
-    # FY2F+VISSR-MetopA+IASI_MatchedPoints_ALL_20150226.png
 
     # find out day and night
     jd = oneHDF5.time / 24. / 3600.  # jday from 1993/01/01 00:00:00
@@ -109,15 +101,9 @@ def run(pair, ymd):
 
     x = oneHDF5.lon1  # 经度数据
     y = oneHDF5.lat1  # 维度数据
-    print('x, y:', len(x), len(y))
-#     d = NC.days.astype('uint8')  # trans to int
-#     if len(d) == 0:
-#         Log.error('No days info in NC.')
-#         return
+    print 'date:{}, x_all:{} y_all:{} '.format(ymd, len(x), len(y))
 
-    print('7')
     draw_butterfly(part1, part2, cur_ymd, ymd, x, y, o_file, map_range)
-    print('8')
     # ------- day ----------
     if np.where(day_index)[0].size > 0:
         o_file = os.path.join(cur_path,
@@ -126,8 +112,8 @@ def run(pair, ymd):
         x_d = x[day_index]
         y_d = y[day_index]
 #         d_d = d[day_index]
+        print 'date:{}, x_day:{} y_day:{} '.format(ymd, len(x_d), len(y_d))
         draw_butterfly(part1, part2, cur_ymd, ymd, x_d, y_d, o_file, map_range)
-        print('10')
     # ---------night ------------
     if np.where(night_index)[0].size > 0:
         o_file = os.path.join(cur_path,
@@ -136,8 +122,8 @@ def run(pair, ymd):
         x_n = x[night_index]
         y_n = y[night_index]
 #         d_n = d[night_index]
+        print 'date:{}, x_night:{} y_night:{} '.format(ymd, len(x_n), len(y_n))
         draw_butterfly(part1, part2, cur_ymd, ymd, x_n, y_n, o_file, map_range)
-        print('11')
     Log.info(u"Success")
 
 
@@ -148,8 +134,9 @@ def draw_butterfly(sat1Nm, sat2Nm,
     """
     画 FY3X 匹配蝴蝶图
     """
+    if len(lons) == 0:
+        return
     plt.style.use(os.path.join(dvPath, 'dv_pub_map.mplstyle'))
-    print('date, lons, lats', ymd_e, len(lons), len(lats))
 #     COLORS = ['#4cd964', '#1abc9c', '#5ac8fa', '#007aff', '#5856d6']
     COLORS = [RED]
     if map_range[0] and map_range[1]:
@@ -211,10 +198,9 @@ def draw_butterfly(sat1Nm, sat2Nm,
         fig.text(0.55, TEXT_Y, '%s' % ymd_s, fontproperties=FONT0)
     fig.text(0.83, TEXT_Y, ORG_NAME, fontproperties=FONT0)
 
-    print('out start')
     pb_io.make_sure_path_exists(os.path.dirname(out_fig_file))
     fig.savefig(out_fig_file, dpi=100)
-    print('out end')
+    print out_fig_file
     plt.close()
     fig.clear()
 
