@@ -610,8 +610,9 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         }
 
         # 获取 MeanBias 信息
+        bias_range = 0.15
         boundary = xmin + (xmax - xmin) * 0.15
-        bias_info = bias_information(x, y, boundary)
+        bias_info = bias_information(x, y, boundary, bias_range)
 
         # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
         bias = np.NaN  # RMD or TBB bias

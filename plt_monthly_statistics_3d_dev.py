@@ -22,7 +22,7 @@ from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
 from DV.dv_pub_3d import plt, add_annotate, set_tick_font, FONT0, FONT_MONO,\
-    draw_distribution, draw_bar, draw_histogram, bias_information
+    draw_distribution, draw_bar, draw_histogram, bias_information, font1
 from PB import pb_time, pb_io
 from plt_io import ReadHDF5, loadYamlCfg
 
@@ -261,7 +261,9 @@ def plot(x, y, weight, picPath,
     ref_temp = reference_list[0]  # 获取拟合系数
 
     # 获取 MeanBias 信息
-    bias_info = bias_information(x, y, 0.1)
+    bias_range = 0.15
+    boundary = xmin + (xmax - xmin) * 0.15
+    bias_info = bias_information(x, y, boundary, bias_range)
 
     # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
     ab = RadCompare
@@ -373,7 +375,9 @@ def plot(x, y, weight, picPath,
     plt.setp(ax1.get_xticklabels(), visible=False)
 
     # 子图的底间距
-    fig.subplots_adjust(bottom=0.16)
+    fig.subplots_adjust(bottom=0.16, top=0.90)
+    font1.set_size(11)
+    fig.suptitle(title, fontsize=11, fontproperties=font1)
     fig.text(0.6, 0.02, '%s' % ym, fontsize=11, fontproperties=FONT0)
     fig.text(0.8, 0.02, ORG_NAME, fontsize=11, fontproperties=FONT0)
     # ---------------
@@ -477,8 +481,7 @@ if len(args) == 2:
 
     while date_s <= date_e:
         ymd = date_s.strftime('%Y%m%d')
-        run(satPair, ymd)
-        # pool.apply_async(run, (satPair, ymd))
+        pool.apply_async(run, (satPair, ymd))
         date_s = date_s + relativedelta(months=1)
     pool.close()
     pool.join()
