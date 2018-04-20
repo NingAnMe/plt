@@ -369,6 +369,10 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e, 
     elif "FY4" in satName:
         plt.ylim(-2, 2)
 
+    # 画 y=0 线
+    plt.plot([xlim_min, xlim_max], [0, 0], color='#808080',
+             linewidth=1.0)
+
     ax = plt.gca()
     # format the ticks
     setXLocator(ax, xlim_min, xlim_max)
@@ -414,7 +418,7 @@ def plot_rmd(date_d, data_d, date_m, data_m, pic_path, title, date_s, date_e, sa
         return
     plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
-    fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
+    fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
 
     ax1 = plt.subplot2grid((1, 1), (0, 0))
 

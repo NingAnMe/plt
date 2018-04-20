@@ -168,6 +168,10 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     plt.xlim(xlim_min, xlim_max)
     plt.ylim(-1, 1)
 
+    # 画 y=0 线
+    plt.plot([xlim_min, xlim_max], [0, 0], color='#808080',
+             linewidth=1.0)
+
     ax = plt.gca()
     # format the ticks
     setXLocator(ax, xlim_min, xlim_max)
