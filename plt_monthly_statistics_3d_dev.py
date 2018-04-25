@@ -307,7 +307,7 @@ def plot(x, y, weight, picPath,
         "scatter_linewidth": 0, "scatter_zorder": 100, "scatter_color": BLUE,
     }
     # 偏差 fill 配置
-    scatter_fill = {
+    background_fill = {
         "fill_marker": 'o-', "fill_size": 6, "fill_alpha": 0.5,
         "fill_linewidth": 0.6, "fill_zorder": 50, "fill_color": RED,
         "fill_step": step,
@@ -318,7 +318,7 @@ def plot(x, y, weight, picPath,
                       zeroline=zeroline,
                       scatter_delta=scatter_delta,
                       avxline=avxline,
-                      scatter_fill=scatter_fill,
+                      background_fill=background_fill,
                       )
 
     # 绘制 Bar 图 -------------------------------------------------
