@@ -328,7 +328,7 @@ def run(pair, ymd, isMonthly):
 def write_md(channel, part1, part2, xname, ymd,
              dict_md, day_or_night):
     """
-    生成 RMD 文件
+    生成 RMD 日数据文件和月数据文件
     :param channel:
     :param part1:
     :param part2:
@@ -349,15 +349,20 @@ def write_md(channel, part1, part2, xname, ymd,
         file_name_daily = os.path.join(
             o_path, '%s_%s_%s_%s_%s_Daily.txt' % (
                 part1, part2, xname.upper(), chan, day_or_night))
-        title = 'date   MD\n'
-        data = "{}  {}\n".format(ymd, dict_md[xname][chan])
 
-        day_data_write(title, data, file_name_daily)
+        # 写入日数据
+        title_daily = 'date    MD\n'
+        data_daily = "{}  {}\n".format(ymd, dict_md[xname][chan])
+        day_data_write(title_daily, data_daily, file_name_daily)
 
+        # 写入月数据
         md_data = load_md_data(file_name_daily)
-        data_monthly = month_average(md_data)
+        md_day_date = md_data["date"]
+        md_day_data = md_data["md"]
+        data_monthly = month_average(md_day_date, md_day_data)
         with open(file_name_monthly, 'w') as f:
-            f.write(title)
+            title_monthly = 'date    MD    STD\n'
+            f.write(title_monthly)
             f.writelines(data_monthly)
 
 
