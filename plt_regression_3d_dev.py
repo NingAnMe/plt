@@ -354,41 +354,49 @@ def write_md(channel, part1, part2, xname, ymd,
 
         day_data_write(title, data, file_name_daily)
 
-        md_data = load_day_md(file_name_daily)
+        md_data = load_md_data(file_name_daily)
         data_monthly = month_average(md_data)
         with open(file_name_monthly, 'w') as f:
             f.write(title)
             f.writelines(data_monthly)
 
-        print file_name_daily
-        print file_name_monthly
 
-
-def load_day_md(md_file):
+def load_md_data(md_file):
     """
     读取日的 MD 文件，返回 np.array
     :param md_file:
     :return:
     """
-    names = ('date', 'md',)
-    formats = ('object', 'f4')
-    data = np.loadtxt(md_file,
-                      converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                      dtype={'names': names,
-                             'formats': formats},
-                      skiprows=1, ndmin=1)
+    try:
+        names = ('date', 'md',)
+        formats = ('object', 'f4')
+        data = np.loadtxt(md_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
+    except Exception, why:
+        print why
+        names = ('date', 'md', 'std')
+        formats = ('object', 'f4', 'f4')
+        data = np.loadtxt(md_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
     return data
 
 
-def month_average(day_data):
+def month_average(day_date, day_data):
     """
-    由 EXT 日数据生成 EXT 月平均数据
-    :param day_data: EXT 日数据
+    由日数据生成月平均数据
+    :param day_date: 日期：datetime 实例
+    :param day_data: 日数据
     :return:
     """
     month_datas = []
-    ymd_start = day_data['date'][0]  # 第一天日期
-    ymd_end = day_data['date'][-1]  # 最后一天日期
+    ymd_start = day_date[0]  # 第一天日期
+    ymd_end = day_date[-1]  # 最后一天日期
     date_start = ymd_start - relativedelta(
         days=(ymd_start.day - 1))  # 第一个月第一天日期
 
@@ -397,18 +405,18 @@ def month_average(day_data):
         date_end = date_start + relativedelta(months=1) - relativedelta(days=1)
 
         # 查找当月所有数据
-        day_date = day_data['date']
         month_idx = np.where(np.logical_and(day_date >= date_start,
                                             day_date <= date_end))
 
-        avg_month = day_data['md'][month_idx]
-        not_nan_idx = np.isfinite(avg_month)
+        avg_month = day_data[month_idx]
+        not_nan_idx = np.isfinite(avg_month)  # 清除 nan 数据
         avg_month = avg_month[not_nan_idx]
 
         ymd_data = date_start.strftime('%Y%m%d')
         avg_data = avg_month.mean()
+        std_data = avg_month.std()
 
-        data = "{}  {}\n".format(ymd_data, avg_data)
+        data = "{}  {}  {}\n".format(ymd_data, avg_data, std_data)
 
         month_datas.append(data)
 
@@ -615,8 +623,6 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         bias_info = bias_information(x, y, boundary, bias_range)
 
         # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
-        bias = np.NaN  # RMD or TBB bias
-        bias_info_md = ''
         ab = RadCompare
         a = ab[0]
         b = ab[1]
@@ -626,6 +632,9 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         elif xname == 'ref':
             bias = (0.25 - (0.25 * a + b)) / 0.25 * 100
             bias_info_md = "Relative Bias (REF 0.25) : {:.4f} %".format(bias)
+        else:
+            bias = np.NaN  # RMD or TBB bias
+            bias_info_md = ''
 
         # 添加注释信息
         distri_annotate = {"left": [], "right": []}
