@@ -37,6 +37,7 @@ def get_ds_font(fontName='OpenSans-Regular.ttf'):
 
 
 FONT0 = get_ds_font()
+FONT1 = get_ds_font()
 FONT_MONO = get_ds_font('DroidSansMono.ttf')
 
 
@@ -230,27 +231,34 @@ def get_md_data(md_file):
     return data
 
 
-def bias_information(x, y, boundary=0.1):
+def bias_information(x, y, boundary=None, bias_range=1):
     """
     # 过滤 range%10 范围的值，计算偏差信息
     # MeanBias( <= 10 % Range) = MD±Std @ MT
     # MeanBias( > 10 % Range) = MD±Std @ MT
+    :param bias_range:
     :param x:
     :param y:
     :param boundary:
     :return: MD Std MT 偏差均值 偏差 std 样本均值
     """
+    bias_info = {}
+
+    if boundary is None:
+        return bias_info
     # 计算偏差
     delta = x - y
 
+    # 筛选大于界限值的数据
     idx_greater = np.where(x > boundary)
     delta_greater = delta[idx_greater]
     x_greater = x[idx_greater]
-
+    # 筛选小于界限值的数据
     idx_lower = np.where(x <= boundary)
     delta_lower = delta[idx_lower]
     x_lower = x[idx_lower]
 
+    # 计算偏差均值，偏差 std 和 样本均值
     md_greater = delta_greater.mean()  # 偏差均值
     std_greater = delta_greater.std()  # 偏差 std
     mt_greater = x_greater.mean()  # 样本均值
@@ -259,10 +267,11 @@ def bias_information(x, y, boundary=0.1):
     std_lower = delta_lower.std()
     mt_lower = x_lower.mean()
 
-    info_lower = "MeanBias(<=10%Range)={:.4f}±{:.4f}@{:.4f}".format(
-        md_lower, std_lower, mt_lower)
-    info_greater = "MeanBias(>10%Range) ={:.4f}±{:.4f}@{:.4f}".format(
-        md_greater, std_greater, mt_greater)
+    # 格式化数据
+    info_lower = "MeanBias(<={:d}%Range)={:.4f}±{:.4f}@{:.4f}".format(
+        int(bias_range*100), md_lower, std_lower, mt_lower)
+    info_greater = "MeanBias(>{:d}%Range) ={:.4f}±{:.4f}@{:.4f}".format(
+        int(bias_range*100), md_greater, std_greater, mt_greater)
 
     bias_info = {"md_greater": md_greater, "std_greater": std_greater,
                  "mt_greater": mt_greater,
@@ -275,10 +284,6 @@ def bias_information(x, y, boundary=0.1):
 
 def set_x_locator(ax, xlim_min, xlim_max):
     day_range = (xlim_max - xlim_min).days
-#     if day_range <= 2:
-#         days = mdates.HourLocator(interval=4)
-#         ax.xaxis.set_major_locator(days)
-#         ax.xaxis.set_major_formatter(mdates.DateFormatter('%H'))
     if day_range <= 60:
         days = mdates.DayLocator(interval=(day_range / 6))
         ax.xaxis.set_major_locator(days)
