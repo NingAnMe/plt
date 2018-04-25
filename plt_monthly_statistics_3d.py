@@ -12,18 +12,18 @@ from datetime import datetime
 from multiprocessing import Pool
 
 import numpy as np
-from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
-from PB.CSC.pb_csc_console import LogServer
+
 from configobj import ConfigObj
 from dateutil.relativedelta import relativedelta
-from matplotlib.ticker import MultipleLocator
 from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
 from DV.dv_pub_3d import plt, add_annotate, set_tick_font, FONT0, FONT_MONO,\
-    draw_distribution, draw_bar, draw_histogram, bias_information, font1
+    draw_distribution, draw_bar, draw_histogram, bias_information, FONT1
 from PB import pb_time, pb_io
+from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
+from PB.CSC.pb_csc_console import LogServer
 from plt_io import ReadHDF5, loadYamlCfg
 
 
@@ -89,7 +89,6 @@ def run(pair, ymd):
 
             # 输出目录
             cur_path = os.path.join(MBA_DIR, pair, ymd[:6])
-
 
             # find out day and night
             if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
@@ -161,7 +160,7 @@ def run(pair, ymd):
 
             # ------- day ----------
             if 'day' in Day_Night:
-                if day_index is not None and np.where(day_index)[0].size > 10 :
+                if day_index is not None and np.where(day_index)[0].size > 10:
                     # rad-specified
                     o_file = os.path.join(cur_path,
                                           '%s_%s_%s_Day_%s' % (pair, o_name, chan, ym))
@@ -173,7 +172,7 @@ def run(pair, ymd):
                          xname, xname_l, xunit, xmin, xmax)
             if 'night' in Day_Night:
                 # ---------night ------------
-                if night_index is not None and np.where(night_index)[0].size > 10 :
+                if night_index is not None and np.where(night_index)[0].size > 10:
                     # rad-specified
                     o_file = os.path.join(cur_path,
                                           '%s_%s_%s_Night_%s' % (pair, o_name, chan, ym))
@@ -217,8 +216,8 @@ def plot(x, y, weight, picPath,
     else:
         step = 0.1
 
+    # 计算回归信息： 斜率，截距，R
     RadCompare = G_reg1d(x, y, w)
-    a, b = RadCompare[0], RadCompare[1]
 
     # 开始绘图
     fig = plt.figure(figsize=(6, 5))
@@ -341,6 +340,8 @@ def plot(x, y, weight, picPath,
         bar_locator = {
             "locator_x": (None, None), "locator_y": (7, 5)
         }
+    else:
+        bar_locator = None
 
     # bar 的宽度
     if xname == "tbb":
@@ -376,8 +377,8 @@ def plot(x, y, weight, picPath,
 
     # 子图的底间距
     fig.subplots_adjust(bottom=0.16, top=0.90)
-    font1.set_size(11)
-    fig.suptitle(title, fontsize=11, fontproperties=font1)
+    FONT1.set_size(11)
+    fig.suptitle(title, fontsize=11, fontproperties=FONT1)
     fig.text(0.6, 0.02, '%s' % ym, fontsize=11, fontproperties=FONT0)
     fig.text(0.8, 0.02, ORG_NAME, fontsize=11, fontproperties=FONT0)
     # ---------------
@@ -389,10 +390,10 @@ def plot(x, y, weight, picPath,
 
 
 def G_reg1d(xx, yy, ww=None):
-    '''
+    """
     description needed
     ww: weights
-    '''
+    """
     rtn = []
     ab = polyfit(xx, yy, 1, w=ww)
     rtn.append(ab[0])
@@ -411,7 +412,7 @@ def get_bar_data(xx, delta, Tmin, Tmax, step):
     std_seg = []
     sampleNums = []
     for i in np.arange(Tmin, Tmax, step):
-        idx = np.where(np.logical_and(xx >= i , xx < (i + step)))[0]
+        idx = np.where(np.logical_and(xx >= i, xx < (i + step)))[0]
 
         if idx.size > 0:
             DTb_block = delta[idx]
@@ -481,6 +482,7 @@ if len(args) == 2:
 
     while date_s <= date_e:
         ymd = date_s.strftime('%Y%m%d')
+        # run(satPair, ymd)
         pool.apply_async(run, (satPair, ymd))
         date_s = date_s + relativedelta(months=1)
     pool.close()
