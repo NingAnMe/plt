@@ -14,7 +14,8 @@ from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
 from DV.dv_pub_legacy import plt, mdates, set_tick_font, FONT0
 
-from DV import dv_pub_3d
+from DV import dv_pub_3d_dev
+from DV.dv_pub_3d_dev import get_bias_data
 from datetime import datetime
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 from matplotlib.ticker import MultipleLocator
@@ -41,13 +42,13 @@ class coeff_abr(object):
             self.error = True
 
     def loadCoeff(self, physical_pair, oname, DayOrNight):
-        '''
+        """
         load Monthly coeff to self.Coeff_M
         load Daily coeff to self.Coeff_D
         args:
         oname: for now must be 'TBBCalCoeff', in future plan may add 'RadCalCoeff'
         DayOrNight: ALL, Day, Night
-        '''
+        """
         if not os.path.isdir(self.path):
             self.error = True
             return
@@ -66,9 +67,9 @@ class coeff_abr(object):
         self.Coeff_D = self.__loadCoeffTxt_D(physical_pair, flst)
 
     def __loadCoeffTxt_M(self, physical_pair, fname):
-        '''
+        """
         read txt, return ndarray
-        '''
+        """
         retAry = None
         names = ['date']
         formats = ['object']
@@ -94,9 +95,9 @@ class coeff_abr(object):
         return retAry
 
     def __loadCoeffTxt_D(self, physical_pair, fnameLst):
-        '''
+        """
         read txt, return ndarray
-        '''
+        """
         retAry = None
         names = ['date']
         formats = ['object']
@@ -107,7 +108,6 @@ class coeff_abr(object):
         convert = lambda x: datetime.strptime(x, "%Y%m%d")
         fnameLst.sort()
         for eachtxt in fnameLst:
-            print eachtxt
             fpath = os.path.join(self.path, eachtxt)
             ary = np.loadtxt(fpath,
                   converters={0:convert},
@@ -123,23 +123,6 @@ class coeff_abr(object):
                 retAry = np.concatenate((retAry, ary), axis=0)  # 合并多天的数据
 
         return retAry
-
-
-def get_md_data(md_file):
-    """
-    读取日的 MD 文件，返回 np.array
-    :param md_file:
-    :return:
-    """
-    names = ('date', 'md',)
-    formats = ('object', 'f4')
-    data = np.loadtxt(md_file,
-                      converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                      dtype={'names': names,
-                             'formats': formats},
-                      skiprows=1, ndmin=1)
-
-    return data
 
 
 def run(pair, date_s, date_e):
@@ -226,17 +209,18 @@ def run(pair, date_s, date_e):
                 b_M = co.Coeff_M['b_%s' % chan]
                 c_M = np.log10(co.Coeff_M['c_%s' % chan])
                 # plot slope Intercept count ------------------------
+                print "plot abc : {} {} {}".format(each, DayOrNight, chan)
                 title = 'Time Series of Slope Intercept & Counts  %s  %s\n(%s = Slope * %s + Intercept)' % \
-                         (chan, DayOrNight,
-                          part1.replace('+', '_'),
-                          part2.replace('+', '_'))
+                        (chan, DayOrNight,
+                         part1.replace('+', '_'),
+                         part2.replace('+', '_'))
 
                 if isLaunch:
                     picPath = os.path.join(ABC_DIR, pair,
                                            '%s_%s_ABC_%s_%s_Launch.png' % (pair, o_name, chan, DayOrNight))
                 else:
                     picPath = os.path.join(ABC_DIR, pair, ymd_e,
-                              '%s_%s_ABC_%s_%s_Year_%s.png' % (pair, o_name, chan, DayOrNight, ymd_e))
+                                           '%s_%s_ABC_%s_%s_Year_%s.png' % (pair, o_name, chan, DayOrNight, ymd_e))
 
                 # 系数坐标范围
                 slope_range = plt_cfg[each]['slope_range'][i]
@@ -251,24 +235,26 @@ def run(pair, date_s, date_e):
 
                 # plot RMD ----------------------------------------------------
                 if xname == "ref" and yname == "ref":
-                    print "plot RMD"
-                    # 从 MD 文件中读取数据
-                    md_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
-                                           "MD")
+                    print "plot RMD : {} {} {}".format(each, DayOrNight, chan)
+                    # 从 BIAS 文件中读取数据
+                    bias_ref_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
+                                                 "BIAS")
                     file_name_monthly = os.path.join(
-                        md_path, '%s_%s_%s_%s_%s_Monthly.txt' % (
+                        bias_ref_path, '%s_%s_%s_%s_%s_Monthly.txt' % (
                             part1, part2, xname.upper(), chan, DayOrNight))
                     file_name_daily = os.path.join(
-                        md_path, '%s_%s_%s_%s_%s_Daily.txt' % (
+                        bias_ref_path, '%s_%s_%s_%s_%s_Daily.txt' % (
                             part1, part2, xname.upper(), chan, DayOrNight))
-                    rmd_d = get_md_data(file_name_daily)
-                    rmd_m = get_md_data(file_name_monthly)
+                    rmd_d = get_bias_data(file_name_daily)
+
+                    rmd_m = get_bias_data(file_name_monthly)
 
                     date_rmd_d = rmd_d["date"]
-                    data_rmd_d = rmd_d["md"]
+                    data_rmd_d = rmd_d["bias"]
                     date_rmd_m = rmd_m["date"]
                     date_rmd_m = date_rmd_m + relativedelta(days=14)
-                    data_rmd_m = rmd_m["md"]
+                    data_rmd_m = rmd_m["bias"]
+                    std_rmd_m = rmd_m["std"]
                     idx_d = np.where(
                         np.logical_and(date_rmd_d >= date_s,
                                        date_rmd_d <= date_e))
@@ -295,6 +281,7 @@ def run(pair, date_s, date_e):
                         plot_rmd(
                             date_rmd_d[idx_d], data_rmd_d[idx_d],
                             date_rmd_m[idx_m], data_rmd_m[idx_m],
+                            std_rmd_m[idx_m],
                             pic_path, date_s, date_e,
                             sat1, pair, chan, DayOrNight, ref_temp,
                             xname, xname_l, xunit,
@@ -303,35 +290,87 @@ def run(pair, date_s, date_e):
 
                 # plot TBBias ------------------------
                 if xname == 'tbb' and yname == 'tbb':
-                    print "plot TBBias"
+                    print "plot TBBias : {} {} {}".format(each, DayOrNight, chan)
+                    # 从 BIAS 文件中读取数据
+                    bias_tbb_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
+                                                 "BIAS")
+                    file_name_monthly = os.path.join(
+                        bias_tbb_path, '%s_%s_%s_%s_%s_Monthly.txt' % (
+                            part1, part2, xname.upper(), chan, DayOrNight))
+                    file_name_daily = os.path.join(
+                        bias_tbb_path, '%s_%s_%s_%s_%s_Daily.txt' % (
+                            part1, part2, xname.upper(), chan, DayOrNight))
+                    tbbias_d = get_bias_data(file_name_daily)
+
+                    tbbias_m = get_bias_data(file_name_monthly)
+
+                    date_tbbias_d = tbbias_d["date"]
+                    data_tbbias_d = tbbias_d["bias"]
+                    date_tbbias_m = tbbias_m["date"]
+                    date_tbbias_m = date_tbbias_m + relativedelta(days=14)
+                    data_tbbias_m = tbbias_m["bias"]
+                    std_tbbias_m = tbbias_m["std"]
+                    idx_d = np.where(
+                        np.logical_and(date_tbbias_d >= date_s,
+                                       date_tbbias_d <= date_e))
+                    idx_m = np.where(
+                        np.logical_and(
+                            date_tbbias_m >= pb_time.ymd2date(ymd_s[:6] + '01'),
+                            date_tbbias_m <= date_e))
+
+                    # 根据拟合系数进行绘制
                     reference_list = plt_cfg[each]['reference'][i]
                     for ref_temp in reference_list:
-                        ref_temp_f = float(ref_temp)
-
-                        bias_D = ref_temp_f - (ref_temp_f * a_D + b_D)
-                        bias_M = ref_temp_f - (ref_temp_f * a_M + b_M)
-
+                        # ref_temp_f = float(ref_temp)
                         if isLaunch:
-                            picPath = os.path.join(OMB_DIR, pair,
-                                                   '%s_TBBias_%s_%s_Launch_%dK.png' % (
-                                                    pair, chan, DayOrNight, ref_temp))
+                            pic_path = os.path.join(
+                                OMB_DIR, pair, '%s_TBBias_%s_%s_Launch_%dK.png' % (
+                                    pair, chan, DayOrNight, ref_temp))
                         else:
                             # plot latest year
-                            picPath = os.path.join(OMB_DIR, pair, ymd_e,
-                                                   '%s_TBBias_%s_%s_Year_%s_%dK.png' % (
-                                                    pair, chan, DayOrNight, ymd_e, ref_temp))
-                        plot_tbbias(date_D[idx_D], bias_D[idx_D],
-                                    date_M[idx_M], bias_M[idx_M],
-                                    picPath, date_s, date_e,
-                                    sat1, pair, chan, DayOrNight, ref_temp,
-                                    xname, xname_l, xunit,
-                                    yname, yname_l, yunit,
-                                    )
+                            pic_path = os.path.join(
+                                OMB_DIR, pair, ymd_e,
+                                '%s_TBBias_%s_%s_Year_%s_%dK.png' % (
+                                    pair, chan, DayOrNight, ymd_e,
+                                    ref_temp))
+                        plot_tbbias(
+                            date_tbbias_d[idx_d], data_tbbias_d[idx_d],
+                            date_tbbias_m[idx_m], data_tbbias_m[idx_m],
+                            std_tbbias_m[idx_m],
+                            pic_path, date_s, date_e,
+                            sat1, pair, chan, DayOrNight, ref_temp,
+                            xname, xname_l, xunit,
+                            yname, yname_l, yunit,
+                        )
+
+                    # reference_list = plt_cfg[each]['reference'][i]
+                    # for ref_temp in reference_list:
+                    #     ref_temp_f = float(ref_temp)
+                    #
+                    #     bias_D = ref_temp_f - (ref_temp_f * a_D + b_D)
+                    #     bias_M = ref_temp_f - (ref_temp_f * a_M + b_M)
+                    #
+                    #     if isLaunch:
+                    #         picPath = os.path.join(OMB_DIR, pair,
+                    #                                '%s_TBBias_%s_%s_Launch_%dK.png' % (
+                    #                                 pair, chan, DayOrNight, ref_temp))
+                    #     else:
+                    #         # plot latest year
+                    #         picPath = os.path.join(OMB_DIR, pair, ymd_e,
+                    #                                '%s_TBBias_%s_%s_Year_%s_%dK.png' % (
+                    #                                 pair, chan, DayOrNight, ymd_e, ref_temp))
+                    #     plot_tbbias(date_D[idx_D], bias_D[idx_D],
+                    #                 date_M[idx_M], bias_M[idx_M],
+                    #                 picPath, date_s, date_e,
+                    #                 sat1, pair, chan, DayOrNight, ref_temp,
+                    #                 xname, xname_l, xunit,
+                    #                 yname, yname_l, yunit,
+                    #                 )
 
                     # plot interpolated TBBias img (obs minus backgroud) -------------
-                    print "plot OMB"
+                    print "plot OMB : {} {} {}".format(each, DayOrNight, chan)
                     title = 'Brightness Temperature Correction\n%s  %s  %s' % \
-                             (pair, chan, DayOrNight)
+                            (pair, chan, DayOrNight)
 
                     if isLaunch:
                         picPath = os.path.join(OMB_DIR, pair,
@@ -436,7 +475,7 @@ def plot_omb(date_D, a_D, b_D,
     plt.close()
 
 
-def plot_tbbias(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
+def plot_tbbias(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
                 sat_name, pair, chan, day_or_night, ref_temp,
                 xname, xname_l, xunit,
                 yname, yname_l, yunit,
@@ -501,7 +540,7 @@ def plot_tbbias(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
         "markersize": 6, "markerfacecolor": None, "markeredgecolor": BLUE,
         "alpha": 0.8, "markeredgewidth": 0.3, "label": "Daily",
     }
-    dv_pub_3d.draw_timeseries(
+    dv_pub_3d_dev.draw_timeseries(
         ax1, date_d, data_d, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_daily,
@@ -511,10 +550,14 @@ def plot_tbbias(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
         "markersize": 5, "markerfacecolor": None, "markeredgecolor": RED,
         "alpha": 0.8, "markeredgewidth": 0, "label": "Monthly",
     }
-    dv_pub_3d.draw_timeseries(
+    background_fill_timeseries = {
+        'x': date_m, 'y': data_m - std_m, 'y1': data_m + std_m, "color": RED,
+    }
+    dv_pub_3d_dev.draw_timeseries(
         ax1, date_m, data_m, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_monthly,
+        background_fill=background_fill_timeseries,
     )
     # --------------------
     plt.tight_layout()
@@ -543,7 +586,7 @@ def plot_tbbias(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
     plt.close()
 
 
-def plot_rmd(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
+def plot_rmd(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
              sat_name, pair, chan, day_or_night, ref_temp,
              xname, xname_l, xunit,
              yname, yname_l, yunit,
@@ -604,7 +647,7 @@ def plot_rmd(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
         "markersize": 6, "markerfacecolor": None, "markeredgecolor": BLUE,
         "alpha": 0.8, "markeredgewidth": 0.3, "label": "Daily",
     }
-    dv_pub_3d.draw_timeseries(
+    dv_pub_3d_dev.draw_timeseries(
         ax1, date_d, data_d, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_daily,
@@ -614,10 +657,14 @@ def plot_rmd(date_d, data_d, date_m, data_m, pic_path, date_s, date_e,
         "markersize": 5, "markerfacecolor": None, "markeredgecolor": RED,
         "alpha": 0.8, "markeredgewidth": 0, "label": "Monthly",
     }
-    dv_pub_3d.draw_timeseries(
+    background_fill_timeseries = {
+        'x': date_m, 'y': data_m - std_m, 'y1': data_m + std_m, "color": RED,
+    }
+    dv_pub_3d_dev.draw_timeseries(
         ax1, date_m, data_m, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_monthly,
+        background_fill=background_fill_timeseries,
     )
     # --------------------
     plt.tight_layout()
@@ -824,6 +871,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
 
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     fig.savefig(picPath)
+    print picPath
     plt.close()
     fig.clear()
 
@@ -915,6 +963,7 @@ def plot_omb(date_D, a_D, b_D,
 
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     plt.savefig(picPath)
+    print picPath
     fig.clear()
     plt.close()
 
@@ -962,11 +1011,13 @@ if len(args) == 2:
     str_time = args[1]
     date_s, date_e = pb_time.arg_str2date(str_time)
     run(satPair, date_s, date_e)
+    Log.info(u'SUCCESS，手动长时间序列绘图程序-----------------------------')
 
 elif len(args) == 1:
     Log.info(u'手动长时间序列绘图程序开始运行 -----------------------------')
     satPair = args[0]
     run(satPair, None, None)
+    Log.info(u'SUCCESS，手动长时间序列绘图程序-----------------------------')
 
 elif len(args) == 0:
     Log.info(u'自动长时间序列绘图程序开始运行 -----------------------------')
@@ -988,6 +1039,7 @@ elif len(args) == 0:
         pool.apply_async(run, (satPair, None, None))
     pool.close()
     pool.join()
+    Log.info(u'SUCCESS，自动长时间序列绘图程序-----------------------------')
 
 else:
     print 'args error'

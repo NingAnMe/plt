@@ -19,8 +19,8 @@ from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
-from DV import dv_pub_3d
-from DV.dv_pub_3d import FONT0, bias_information, day_data_write, plt
+from DV import dv_pub_3d_dev
+from DV.dv_pub_3d_dev import FONT0, bias_information, day_data_write, plt, get_bias_data, get_cabr_data
 from DM.SNO.dm_sno_cross_calc_map import BLUE
 from PB.CSC.pb_csc_console import LogServer
 from PB.pb_time import get_local_time
@@ -308,25 +308,98 @@ def run(pair, ymd, isMonthly):
             for o_name in dict_cabr:
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr,
                          'ALL', isMonthly)
-                write_md(channel, part1, part2, xname, ymd,
-                         dict_md, 'ALL')
+                write_bias(channel, part1, part2, xname, ymd,
+                           dict_md, 'ALL')
+                write_cabr(channel, part1, part2, o_name, ymd,
+                           dict_cabr, 'ALL')
         if 'day' in Day_Night:
             for o_name in dict_cabr_d:
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_d,
                          'Day', isMonthly)
-                write_md(channel, part1, part2, xname, ymd,
-                         dict_md_d, 'Day')
+                write_bias(channel, part1, part2, xname, ymd,
+                           dict_md_d, 'Day')
+                write_cabr(channel, part1, part2, o_name, ymd,
+                           dict_cabr_d, 'Day')
         if 'night' in Day_Night:
             for o_name in dict_cabr_n:
                 writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_n,
                          'Night', isMonthly)
-                write_md(channel, part1, part2, xname, ymd,
-                         dict_md_n, 'Night')
+                write_bias(channel, part1, part2, xname, ymd,
+                           dict_md_n, 'Night')
+                write_cabr(channel, part1, part2, o_name, ymd,
+                           dict_cabr_n, 'Night')
         lock.release()
 
 
-def write_md(channel, part1, part2, xname, ymd,
-             dict_md, day_or_night):
+def write_cabr(channel, part1, part2, o_name, ymd,
+               dict_cabr, day_or_night):
+    """
+    生成 CABR 数据文件
+    :param channel:
+    :param part1:
+    :param part2:
+    :param o_name:
+    :param ymd:
+    :param dict_cabr:
+    :param day_or_night:
+    :return:
+    """
+    for chan in channel:
+        o_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2), "CABR")
+        file_name_monthly = os.path.join(
+            o_path, '%s_%s_%s_%s_%s_Monthly.txt' % (
+                part1, part2, o_name, chan, day_or_night))
+        file_name_daily = os.path.join(
+            o_path, '%s_%s_%s_%s_%s_Daily.txt' % (
+                part1, part2, o_name, chan, day_or_night))
+
+        # 写入日数据
+        title_daily = ("{:10}  " * 5).format("YMD", "Count", "Slope", "Intercept", "RSquared") + "\n"
+        c, a, b, r = dict_cabr[o_name][chan]
+        data_daily = ("{:10}  " * 5).format(ymd, c, a, b, r) + "\n"
+        day_data_write(title_daily, data_daily, file_name_daily)
+
+        # 写入月数据
+        cabr_data = get_cabr_data(file_name_daily)
+        title_monthly = ("{:10}  " * 8).format("YMD", "Count", "Slope", "Slope_STD",
+                                               "Intercept", "Intercept_STD", "RSquared", "RSquared_STD") + "\n"
+        date_data = cabr_data['date']
+
+        if len(date_data) <= 2:  # 如果小于2天的数据，不计算月平均
+            continue
+
+        c_data = cabr_data['count']
+        s_data = np.vstack(cabr_data['slope'])
+        i_data = np.vstack(cabr_data['intercept'])
+        r_data = np.vstack(cabr_data['rsquared'])
+
+        abr_data = np.concatenate((s_data, i_data, r_data), axis=1)  # 合并 a b c 数据
+
+        count_monthly = month_count(date_data, c_data)  # 计算月总数
+        abr_monthly = month_average(date_data, abr_data)[:, 1:]  # 计算月平均和STD
+        data_monthly = np.concatenate((count_monthly, abr_monthly), axis=1)
+
+        for data in data_monthly:
+            ymd_monthly = data[0]
+            count_monthly = data[1]
+            slope_mean_monthly = data[2]
+            intercept_mean_monthly = data[3]
+            rsquared_mean_monthly = data[4]
+
+            slope_std_monthly = data[5]
+            intercept_std_monthly = data[6]
+            rsquared_std_monthly = data[7]
+
+            data_str = ("{:10}  " * 8).format(ymd_monthly, count_monthly, slope_mean_monthly, slope_std_monthly,
+                                              intercept_mean_monthly, intercept_std_monthly,
+                                              rsquared_mean_monthly, rsquared_std_monthly) + "\n"
+            day_data_write(title_monthly, data_str, file_name_monthly)
+        print file_name_daily
+        print file_name_monthly
+
+
+def write_bias(channel, part1, part2, xname, ymd,
+               dict_md, day_or_night):
     """
     生成 RMD 日数据文件和月数据文件
     :param channel:
@@ -342,7 +415,7 @@ def write_md(channel, part1, part2, xname, ymd,
         return
 
     for chan in channel:
-        o_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2), "MD")
+        o_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2), "BIAS")
         file_name_monthly = os.path.join(
             o_path, '%s_%s_%s_%s_%s_Monthly.txt' % (
                 part1, part2, xname.upper(), chan, day_or_night))
@@ -351,52 +424,31 @@ def write_md(channel, part1, part2, xname, ymd,
                 part1, part2, xname.upper(), chan, day_or_night))
 
         # 写入日数据
-        title_daily = 'date    MD\n'
-        data_daily = "{}  {}\n".format(ymd, dict_md[xname][chan])
+        title_daily = '{:10}  {:10}\n'.format("YMD", "Bias")
+        data_daily = "{:10}  {:10}\n".format(ymd, dict_md[xname][chan])
         day_data_write(title_daily, data_daily, file_name_daily)
 
         # 写入月数据
-        md_data = load_md_data(file_name_daily)
-        md_day_date = md_data["date"]
-        md_day_data = md_data["md"]
-        data_monthly = month_average(md_day_date, md_day_data)
-        with open(file_name_monthly, 'w') as f:
-            title_monthly = 'date    MD    STD\n'
-            f.write(title_monthly)
-            f.writelines(data_monthly)
+        title_monthly = '{:10}  {:10}  {:10}\n'.format("YMD", "Bias", "STD")
+        bias_data = get_bias_data(file_name_daily)
+        bias_day_date = bias_data["date"]
+        bias_day_data = bias_data["bias"]
+        data_monthly = month_average(bias_day_date, bias_day_data)  # 计算月平均和STD
+        for data in data_monthly:
+            ymd_monthly = data[0]
+            mean_monthly = data[1]
+            std_monthly = data[2]
+            data_str = "{:10}  {:10}  {:10}\n".format(ymd_monthly, mean_monthly, std_monthly)
+            day_data_write(title_monthly, data_str, file_name_monthly)
+        print file_name_daily
+        print file_name_monthly
 
 
-def load_md_data(md_file):
+def month_count(day_date, data_day):
     """
-    读取日的 MD 文件，返回 np.array
-    :param md_file:
-    :return:
-    """
-    try:
-        names = ('date', 'md',)
-        formats = ('object', 'f4')
-        data = np.loadtxt(md_file,
-                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                          dtype={'names': names,
-                                 'formats': formats},
-                          skiprows=1, ndmin=1)
-    except Exception, why:
-        print why
-        names = ('date', 'md', 'std')
-        formats = ('object', 'f4', 'f4')
-        data = np.loadtxt(md_file,
-                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                          dtype={'names': names,
-                                 'formats': formats},
-                          skiprows=1, ndmin=1)
-    return data
-
-
-def month_average(day_date, day_data):
-    """
-    由日数据生成月平均数据
+    由日数据生成月总计数据
     :param day_date: 日期：datetime 实例
-    :param day_data: 日数据
+    :param data_day: 日数据
     :return:
     """
     month_datas = []
@@ -413,19 +465,74 @@ def month_average(day_date, day_data):
         month_idx = np.where(np.logical_and(day_date >= date_start,
                                             day_date <= date_end))
 
-        avg_month = day_data[month_idx]
-        not_nan_idx = np.isfinite(avg_month)  # 清除 nan 数据
-        avg_month = avg_month[not_nan_idx]
+        data_month = data_day[month_idx]
+        not_nan_idx = np.isfinite(data_month)  # 清除 nan 数据
+        data_month = data_month[not_nan_idx]
 
         ymd_data = date_start.strftime('%Y%m%d')
-        avg_data = avg_month.mean()
-        std_data = avg_month.std()
+        count_data = np.sum(data_month)
 
-        data = "{}  {}  {}\n".format(ymd_data, avg_data, std_data)
+        data = [ymd_data, count_data.tolist()]
 
         month_datas.append(data)
 
         date_start = date_start + relativedelta(months=1)
+
+    return np.array(month_datas)
+
+
+def month_average(day_date, day_data):
+    """
+    由日数据生成月平均数据
+    :param day_date: 日期：datetime 实例
+    :param day_data: 日数据
+    :return:
+    """
+    month_datas = {
+        "ymd": [],
+        "mean_data": [],
+        "std_data": [],
+    }
+    ymd_start = day_date[0]  # 第一天日期
+    ymd_end = day_date[-1]  # 最后一天日期
+    date_start = ymd_start - relativedelta(
+        days=(ymd_start.day - 1))  # 第一个月第一天日期
+
+    while date_start <= ymd_end:
+        # 当月最后一天日期
+        date_end = date_start + relativedelta(months=1) - relativedelta(days=1)
+
+        # 查找当月所有数据
+        month_idx = np.where(np.logical_and(day_date >= date_start,
+                                            day_date <= date_end))
+
+        data_month = day_data[month_idx]
+        ymd_data = date_start.strftime('%Y%m%d')
+
+        data_month = np.ma.masked_invalid(data_month)  # mask nan 数据
+        mean_data = np.mean(data_month, axis=0)
+        std_data = np.std(data_month, axis=0)
+
+        # 如果被掩码掩盖掉，用 nan 替换
+        if np.ma.is_masked(mean_data):
+            idx_masked = mean_data.mask
+            mean_data = np.asarray(mean_data)
+            mean_data[idx_masked] = np.NaN
+        if np.ma.is_masked(std_data):
+            idx_masked = std_data.mask
+            std_data = np.asarray(std_data)
+            std_data[idx_masked] = np.NaN
+
+        month_datas.get("ymd").append([ymd_data])
+        month_datas.get("mean_data").append(mean_data.tolist())
+        month_datas.get("std_data").append(std_data.tolist())
+
+        date_start = date_start + relativedelta(months=1)
+
+    ymd_data = np.vstack(month_datas.get("ymd"))
+    mean_data = np.vstack(month_datas.get("mean_data"))
+    std_data = np.vstack(month_datas.get("std_data"))
+    month_datas = np.concatenate((ymd_data, mean_data, std_data), axis=1)
 
     return month_datas
 
@@ -441,11 +548,11 @@ def writeTxt(channel, part1, part2, o_name, ymd,
     if isMonthly:
         FileName = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
                                 '%s_%s_%s_%s_Monthly.txt' % (
-                                part1, part2, o_name, DayOrNight))
+                                    part1, part2, o_name, DayOrNight))
     else:
         FileName = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
                                 '%s_%s_%s_%s_%s.txt' % (
-                                part1, part2, o_name, DayOrNight, ymd[:4]))
+                                    part1, part2, o_name, DayOrNight, ymd[:4]))
 
     title_line = 'YMD       '
     newline = ''
@@ -511,7 +618,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
          is_diagonal, isMonthly):
     plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
 
-    # 过滤 正负 delta+8倍std 的杂点 ------------------------
+    # 过滤 正负 delta+8 倍 std 的杂点 ------------------------
     w = 1.0 / weight if weight is not None else None
     RadCompare = G_reg1d(x, y, w)
     reg_line = x * RadCompare[0] + RadCompare[1]
@@ -589,7 +696,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         scatter_point = {"scatter_alpha": 0.8}
 
-        dv_pub_3d.draw_regression(
+        dv_pub_3d_dev.draw_regression(
             ax1, x, y, label=regress_label, ax_annotate=regress_annotate,
             axislimit=regress_axislimit, locator=regress_locator,
             diagonal=regress_diagonal, regressline=regress_regressline,
@@ -667,14 +774,14 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         # 偏差回归线配置
         regressline = {"line_color": 'r', "line_width": 1.2}
-        dv_pub_3d.draw_distribution(ax2, x, y, label=distri_label,
-                                    ax_annotate=distri_annotate,
-                                    axislimit=distri_limit,
-                                    locator=distri_locator,
-                                    zeroline=zeroline,
-                                    scatter_delta=scatter_delta,
-                                    regressline=regressline,
-                                    )
+        dv_pub_3d_dev.draw_distribution(ax2, x, y, label=distri_label,
+                                        ax_annotate=distri_annotate,
+                                        axislimit=distri_limit,
+                                        locator=distri_locator,
+                                        zeroline=zeroline,
+                                        scatter_delta=scatter_delta,
+                                        regressline=regressline,
+                                        )
 
         # 画直方图 --------------------------------------------------
         histogram_xmin = xmin
@@ -706,12 +813,12 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             "label": part2, "color": "blue", "alpha": 0.4, "bins": 100
         }
 
-        dv_pub_3d.draw_histogram(
+        dv_pub_3d_dev.draw_histogram(
             ax3, x, label=histogram_label, locator=histogram_locator,
             axislimit=histogram_axislimit, histogram=histogram_x,
         )
 
-        dv_pub_3d.draw_histogram(
+        dv_pub_3d_dev.draw_histogram(
             ax3, y, label=histogram_label, locator=histogram_locator,
             axislimit=histogram_axislimit, histogram=histogram_y,
         )
@@ -773,7 +880,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         scatter_point = {"scatter_alpha": 0.8}
 
-        dv_pub_3d.draw_regression(
+        dv_pub_3d_dev.draw_regression(
             ax1, x, y, label=regress_label, ax_annotate=regress_annotate,
             axislimit=regress_axislimit, locator=regress_locator,
             diagonal=regress_diagonal, regressline=regress_regressline,
@@ -839,7 +946,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         density = {
             "size": 5, "marker": "o", "alpha": 1
         }
-        dv_pub_3d.draw_regression(
+        dv_pub_3d_dev.draw_regression(
             ax1, x, y, label=density_label, ax_annotate=density_annotate,
             axislimit=density_axislimit, locator=density_locator,
             diagonal=density_diagonal, regressline=density_regressline,
@@ -853,11 +960,12 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     pb_io.make_sure_path_exists(os.path.dirname(o_file))
     fig.savefig(o_file, dpi=100)
     print o_file
+    print '-' * 50
     fig.clear()
     plt.close()
 
     return [len(x), RadCompare[0], RadCompare[1],
-            RadCompare[4]], bias  # num, a, b, r, md
+            RadCompare[4]], bias  # num, a, b, r, bias
 
 
 def G_reg1d(xx, yy, ww=None):
@@ -934,8 +1042,8 @@ if __name__ == "__main__":
 
         while date_s <= date_e:
             ymd = date_s.strftime('%Y%m%d')
-            run(satPair, ymd, isMonthly)
-            # pool.apply_async(run, (satPair, ymd, isMonthly))
+            # run(satPair, ymd, isMonthly)
+            pool.apply_async(run, (satPair, ymd, isMonthly))
             date_s = date_s + timeStep
 
         pool.close()

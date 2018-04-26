@@ -37,7 +37,7 @@ def get_ds_font(fontName='OpenSans-Regular.ttf'):
 
 
 FONT0 = get_ds_font()
-font1 = get_ds_font()
+FONT1 = get_ds_font()
 FONT_MONO = get_ds_font('DroidSansMono.ttf')
 
 
@@ -214,19 +214,54 @@ def get_bar_data(xx, delta, Tmin, Tmax, step):
         sampleNums)
 
 
-def get_md_data(md_file):
+def get_cabr_data(cbar_file):
+    """
+    读取日的 CABR 文件，返回 np.array
+    :param cbar_file:
+    :return:
+    """
+    try:
+        names = ('date', 'count', 'slope', "intercept", "rsquared")
+        formats = ('object', 'i4', 'f4', "f4", "f4")
+        data = np.loadtxt(cbar_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
+    except IndexError:
+        names = ('date', 'count', 'slope', "intercept", "rsquared")
+        formats = ('object', 'i4', 'f4', "f4", "f4")
+        data = np.loadtxt(cbar_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
+
+    return data
+
+
+def get_bias_data(md_file):
     """
     读取日的 MD 文件，返回 np.array
     :param md_file:
     :return:
     """
-    names = ('date', 'md',)
-    formats = ('object', 'f4')
-    data = np.loadtxt(md_file,
-                      converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                      dtype={'names': names,
-                             'formats': formats},
-                      skiprows=1, ndmin=1)
+    try:
+        names = ('date', 'bias', 'std')
+        formats = ('object', 'f4', 'f4')
+        data = np.loadtxt(md_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
+    except IndexError:
+        names = ('date', 'bias',)
+        formats = ('object', 'f4')
+        data = np.loadtxt(md_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
 
     return data
 
@@ -236,24 +271,29 @@ def bias_information(x, y, boundary=None, bias_range=1):
     # 过滤 range%10 范围的值，计算偏差信息
     # MeanBias( <= 10 % Range) = MD±Std @ MT
     # MeanBias( > 10 % Range) = MD±Std @ MT
+    :param bias_range:
     :param x:
     :param y:
     :param boundary:
     :return: MD Std MT 偏差均值 偏差 std 样本均值
     """
+    bias_info = {}
+
     if boundary is None:
-        return
+        return bias_info
     # 计算偏差
     delta = x - y
 
+    # 筛选大于界限值的数据
     idx_greater = np.where(x > boundary)
     delta_greater = delta[idx_greater]
     x_greater = x[idx_greater]
-
+    # 筛选小于界限值的数据
     idx_lower = np.where(x <= boundary)
     delta_lower = delta[idx_lower]
     x_lower = x[idx_lower]
 
+    # 计算偏差均值，偏差 std 和 样本均值
     md_greater = delta_greater.mean()  # 偏差均值
     std_greater = delta_greater.std()  # 偏差 std
     mt_greater = x_greater.mean()  # 样本均值
@@ -262,6 +302,7 @@ def bias_information(x, y, boundary=None, bias_range=1):
     std_lower = delta_lower.std()
     mt_lower = x_lower.mean()
 
+    # 格式化数据
     info_lower = "MeanBias(<={:d}%Range)={:.4f}±{:.4f}@{:.4f}".format(
         int(bias_range * 100), md_lower, std_lower, mt_lower)
     info_greater = "MeanBias(>{:d}%Range) ={:.4f}±{:.4f}@{:.4f}".format(
@@ -457,7 +498,7 @@ def draw_regression(ax, x, y, label=None, ax_annotate=None,
 def draw_distribution(ax, x, y, label=None, ax_annotate=None,
                       axislimit=None, locator=None,
                       avxline=None, zeroline=None, scatter_delta=None,
-                      scatter_fill=None, regressline=None, ):
+                      background_fill=None, regressline=None, ):
     """
     画偏差分布图
     :param ax:
@@ -470,7 +511,7 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
     :param avxline:
     :param zeroline:
     :param scatter_delta:
-    :param scatter_fill:
+    :param background_fill:
     :param regressline:
     :return:
     """
@@ -527,10 +568,10 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
                 zorder=100)
 
     # 画背景填充线
-    if scatter_fill is not None:
+    if background_fill is not None:
         delta = x - y
-        fill_color = scatter_fill.get("fill_color")
-        fill_step = scatter_fill.get("fill_step")
+        fill_color = background_fill.get("fill_color")
+        fill_step = background_fill.get("fill_step")
         T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xmin,
                                                             xmax, fill_step)
         ax.plot(T_seg, mean_seg, 'o-',
@@ -792,6 +833,7 @@ def draw_bar(ax, x, y, label=None, ax_annotate=None,
 def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
                     axislimit=None, locator=None,
                     zeroline=None, timeseries=None,
+                    background_fill=None,
                     ):
     if axislimit is not None:
         xlimit = axislimit.get("xlimit")
@@ -838,7 +880,17 @@ def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
                 markeredgecolor=ts_markeredgecolor,
                 alpha=ts_alpha,
                 mew=ts_markeredgewidth,
-                label=ts_label)
+                label=ts_label,
+                zorder=100)
+
+    if background_fill is not None:
+        fill_color = background_fill.get("color")
+        x_fill = background_fill.get("x")
+        y_fill = background_fill.get("y")
+        y1_fill = background_fill.get("y1")
+        ax.fill_between(x_fill, y_fill, y1_fill,
+                        facecolor=fill_color, edgecolor=fill_color,
+                        interpolate=True, alpha=0.2, zorder=80)
 
     # 设定x y 轴的范围
     ax.set_xlim(xmin, xmax)

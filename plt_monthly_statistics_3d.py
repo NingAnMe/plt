@@ -20,7 +20,7 @@ from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
 from DV.dv_pub_3d import plt, add_annotate, set_tick_font, FONT0, FONT_MONO,\
-    draw_distribution, draw_bar, draw_histogram, bias_information, font1
+    draw_distribution, draw_bar, draw_histogram, bias_information, FONT1
 from PB import pb_time, pb_io
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
 from PB.CSC.pb_csc_console import LogServer
