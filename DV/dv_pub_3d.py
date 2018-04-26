@@ -8,10 +8,10 @@ import os
 from math import floor, ceil
 from datetime import datetime
 
-
 import numpy as np
 from scipy import stats
 import matplotlib as mpl
+
 mpl.use('Agg')  # 必须加这个字段，否则引用 pyplot 服务器会报错，服务器上面没有 TK 框架
 
 import matplotlib.pyplot as plt
@@ -214,19 +214,54 @@ def get_bar_data(xx, delta, Tmin, Tmax, step):
         sampleNums)
 
 
-def get_md_data(md_file):
+def get_cabr_data(cbar_file):
+    """
+    读取日的 CABR 文件，返回 np.array
+    :param cbar_file:
+    :return:
+    """
+    try:
+        names = ('date', 'count', 'slope', "intercept", "rsquared")
+        formats = ('object', 'i4', 'f4', "f4", "f4")
+        data = np.loadtxt(cbar_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
+    except IndexError:
+        names = ('date', 'count', 'slope', "intercept", "rsquared")
+        formats = ('object', 'i4', 'f4', "f4", "f4")
+        data = np.loadtxt(cbar_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
+
+    return data
+
+
+def get_bias_data(md_file):
     """
     读取日的 MD 文件，返回 np.array
     :param md_file:
     :return:
     """
-    names = ('date', 'md',)
-    formats = ('object', 'f4')
-    data = np.loadtxt(md_file,
-                      converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                      dtype={'names': names,
-                             'formats': formats},
-                      skiprows=1, ndmin=1)
+    try:
+        names = ('date', 'bias', 'std')
+        formats = ('object', 'f4', 'f4')
+        data = np.loadtxt(md_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
+    except IndexError:
+        names = ('date', 'bias',)
+        formats = ('object', 'f4')
+        data = np.loadtxt(md_file,
+                          converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
+                          dtype={'names': names,
+                                 'formats': formats},
+                          skiprows=1, ndmin=1)
 
     return data
 
@@ -269,9 +304,9 @@ def bias_information(x, y, boundary=None, bias_range=1):
 
     # 格式化数据
     info_lower = "MeanBias(<={:d}%Range)={:.4f}±{:.4f}@{:.4f}".format(
-        int(bias_range*100), md_lower, std_lower, mt_lower)
+        int(bias_range * 100), md_lower, std_lower, mt_lower)
     info_greater = "MeanBias(>{:d}%Range) ={:.4f}±{:.4f}@{:.4f}".format(
-        int(bias_range*100), md_greater, std_greater, mt_greater)
+        int(bias_range * 100), md_greater, std_greater, mt_greater)
 
     bias_info = {"md_greater": md_greater, "std_greater": std_greater,
                  "mt_greater": mt_greater,
@@ -463,7 +498,7 @@ def draw_regression(ax, x, y, label=None, ax_annotate=None,
 def draw_distribution(ax, x, y, label=None, ax_annotate=None,
                       axislimit=None, locator=None,
                       avxline=None, zeroline=None, scatter_delta=None,
-                      scatter_fill=None, regressline=None, ):
+                      background_fill=None, regressline=None, ):
     """
     画偏差分布图
     :param ax:
@@ -476,7 +511,7 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
     :param avxline:
     :param zeroline:
     :param scatter_delta:
-    :param scatter_fill:
+    :param background_fill:
     :param regressline:
     :return:
     """
@@ -533,10 +568,10 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
                 zorder=100)
 
     # 画背景填充线
-    if scatter_fill is not None:
+    if background_fill is not None:
         delta = x - y
-        fill_color = scatter_fill.get("fill_color")
-        fill_step = scatter_fill.get("fill_step")
+        fill_color = background_fill.get("fill_color")
+        fill_step = background_fill.get("fill_step")
         T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xmin,
                                                             xmax, fill_step)
         ax.plot(T_seg, mean_seg, 'o-',
@@ -798,6 +833,7 @@ def draw_bar(ax, x, y, label=None, ax_annotate=None,
 def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
                     axislimit=None, locator=None,
                     zeroline=None, timeseries=None,
+                    background_fill=None,
                     ):
     if axislimit is not None:
         xlimit = axislimit.get("xlimit")
@@ -844,7 +880,17 @@ def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
                 markeredgecolor=ts_markeredgecolor,
                 alpha=ts_alpha,
                 mew=ts_markeredgewidth,
-                label=ts_label)
+                label=ts_label,
+                zorder=100)
+
+    if background_fill is not None:
+        fill_color = background_fill.get("color")
+        x_fill = background_fill.get("x")
+        y_fill = background_fill.get("y")
+        y1_fill = background_fill.get("y1")
+        ax.fill_between(x_fill, y_fill, y1_fill,
+                        facecolor=fill_color, edgecolor=fill_color,
+                        interpolate=True, alpha=0.2, zorder=80)
 
     # 设定x y 轴的范围
     ax.set_xlim(xmin, xmax)
@@ -877,7 +923,7 @@ def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
             ax.yaxis.set_minor_locator(
                 MultipleLocator(
                     (yticklocs[1] - yticklocs[0]) / minor_locator_y))
-    
+
     # 添加 x 轴年月标签文字
     set_x_locator(ax, xmin, xmax)
 
