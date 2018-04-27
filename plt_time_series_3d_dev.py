@@ -343,30 +343,6 @@ def run(pair, date_s, date_e):
                             yname, yname_l, yunit,
                         )
 
-                    # reference_list = plt_cfg[each]['reference'][i]
-                    # for ref_temp in reference_list:
-                    #     ref_temp_f = float(ref_temp)
-                    #
-                    #     bias_D = ref_temp_f - (ref_temp_f * a_D + b_D)
-                    #     bias_M = ref_temp_f - (ref_temp_f * a_M + b_M)
-                    #
-                    #     if isLaunch:
-                    #         picPath = os.path.join(OMB_DIR, pair,
-                    #                                '%s_TBBias_%s_%s_Launch_%dK.png' % (
-                    #                                 pair, chan, DayOrNight, ref_temp))
-                    #     else:
-                    #         # plot latest year
-                    #         picPath = os.path.join(OMB_DIR, pair, ymd_e,
-                    #                                '%s_TBBias_%s_%s_Year_%s_%dK.png' % (
-                    #                                 pair, chan, DayOrNight, ymd_e, ref_temp))
-                    #     plot_tbbias(date_D[idx_D], bias_D[idx_D],
-                    #                 date_M[idx_M], bias_M[idx_M],
-                    #                 picPath, date_s, date_e,
-                    #                 sat1, pair, chan, DayOrNight, ref_temp,
-                    #                 xname, xname_l, xunit,
-                    #                 yname, yname_l, yunit,
-                    #                 )
-
                     # plot interpolated TBBias img (obs minus backgroud) -------------
                     print "plot OMB : {} {} {}".format(each, DayOrNight, chan)
                     title = 'Brightness Temperature Correction\n%s  %s  %s' % \
@@ -382,6 +358,132 @@ def run(pair, date_s, date_e):
                                                 pair, chan, DayOrNight, ymd_e))
                     plot_omb(date_D[idx_D], a_D[idx_D], b_D[idx_D],
                              picPath, title, date_s, date_e)
+
+
+def plot_abc(date_D, a_D, b_D, c_D,
+             date_M, a_M, b_M, c_M,
+             picPath, title,
+             date_s, date_e,
+             slope_min, slope_max,
+             var):
+    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    fig = plt.figure(figsize=(6, 6))
+    ax1 = plt.subplot(311)
+    ax2 = plt.subplot(312, sharex=ax1)
+    ax3 = plt.subplot(313, sharex=ax1)
+
+    # format the Xticks
+    xlim_min = pb_time.ymd2date('%04d%02d01' % (date_s.year, date_s.month))
+    xlim_max = date_e
+    ax1.set_xlim(xlim_min, xlim_max)
+
+    # format the Yticks\
+    # Y 轴，坐标轴范围
+    if var == "tbb-tbb" or var == "ref-ref":
+        ax1.set_ylim(slope_min, slope_max)
+        ax1.yaxis.set_major_locator(MultipleLocator(0.01))
+        ax1.yaxis.set_minor_locator(MultipleLocator(0.002))
+    elif var == "dn-ref":
+        ax1.set_ylim(slope_min, slope_max)
+        # 根据要求：dn-ref 的图，ax1 需要有两种坐标范围
+        if slope_max >= 0.00030:
+            ax1.yaxis.set_major_locator(MultipleLocator(0.00010))
+            ax1.yaxis.set_minor_locator(MultipleLocator(0.00002))
+        else:
+            ax1.yaxis.set_major_locator(MultipleLocator(0.00002))
+            ax1.yaxis.set_minor_locator(MultipleLocator(0.000004))
+    if var == "tbb-tbb":
+        ax2.set_ylim(-30, 30)
+        ax2.yaxis.set_major_locator(MultipleLocator(10))
+        ax2.yaxis.set_minor_locator(MultipleLocator(5))
+    elif var == "ref-ref":
+        ax2.set_ylim(-0.1, 0.1)
+        ax2.yaxis.set_major_locator(MultipleLocator(0.02))
+        ax2.yaxis.set_minor_locator(MultipleLocator(0.01))
+    elif var == "dn-ref":
+        ax2.set_ylim(-0.08, 0.08)
+        ax2.yaxis.set_major_locator(MultipleLocator(0.02))
+        ax2.yaxis.set_minor_locator(MultipleLocator(0.01))
+    ax3.set_ylim(0, 7)
+    ax3.yaxis.set_major_locator(MultipleLocator(1))
+    ax3.yaxis.set_minor_locator(MultipleLocator(0.5))
+
+    # plot ax1 -------------------------------------------------
+    plt.sca(ax1)
+    plt.plot(date_D, a_D, 'x', ms=5,
+             markerfacecolor=None, markeredgecolor=BLUE, alpha=0.8,
+             mew=0.3, label='Daily')
+    plt.plot(date_M, a_M, 'o-',
+             ms=4, lw=0.6, c=RED,
+             mew=0, label='Monthly')
+    plt.ylabel('Slope', fontsize=11, fontproperties=FONT0)
+    plt.grid(True)
+    plt.title(title, fontsize=12, fontproperties=FONT0)
+    set_tick_font(ax1)
+    plt.setp(ax1.get_xticklabels(), visible=False)
+
+    # plot ax2 -------------------------------------------------
+    plt.sca(ax2)
+    plt.plot(date_D, b_D, 'x', ms=5,
+             markerfacecolor=None, markeredgecolor=BLUE, alpha=0.8,
+             mew=0.3, label='Daily')
+    plt.plot(date_M, b_M, 'o-',
+             ms=4, lw=0.6, c=RED,
+             mew=0, label='Monthly')
+    plt.ylabel('Intercept', fontsize=11, fontproperties=FONT0)
+    plt.grid(True)
+    set_tick_font(ax2)
+    plt.setp(ax2.get_xticklabels(), visible=False)
+
+    # point number -------------------------------------------------
+    plt.sca(ax3)
+
+    plt.fill_between(date_D, 0, c_D,
+                 edgecolor=BLUE, facecolor=BLUE, alpha=0.6)
+#     plt.fill_between(date_M, 0, c_M,
+#                  edgecolor=RED, facecolor=RED, alpha=0.5)
+#     plt.bar(date_M, c_M, width=1, align='edge',  # "center",
+#             color=RED, linewidth=0)
+    plt.plot(date_M, c_M, 'o-',
+             ms=4, lw=0.6, c=RED,
+             mew=0, label='Monthly')
+    plt.ylabel('Number of sample points\nlog (base = 10)', fontsize=11, fontproperties=FONT0)
+    plt.grid(True)
+    set_tick_font(ax3)
+
+    setXLocator(ax3, xlim_min, xlim_max)
+
+#     circle1 = mpatches.Circle((430, 563), 5, color=BLUE, ec=EDGE_GRAY, lw=0)
+#     circle2 = mpatches.Circle((508, 563), 5, color=RED, ec=EDGE_GRAY, lw=0)
+#     fig.patches.extend([circle1, circle2])
+#
+#     fig.text(0.74, 0.93, 'Daily', color=BLUE, fontproperties=FONT0)
+#     fig.text(0.86, 0.93, 'Monthly', color=RED, fontproperties=FONT0)
+    #---------------
+    plt.tight_layout()
+    fig.subplots_adjust(bottom=0.14)
+
+    circle1 = mpatches.Circle((74, 18), 6, color=BLUE, ec=EDGE_GRAY, lw=0)
+    circle2 = mpatches.Circle((164, 18), 6, color=RED, ec=EDGE_GRAY, lw=0)
+    fig.patches.extend([circle1, circle2])
+
+    fig.text(0.15, 0.02, 'Daily', color=BLUE, fontproperties=FONT0)
+    fig.text(0.3, 0.02, 'Monthly', color=RED, fontproperties=FONT0)
+
+    ymd_s, ymd_e = date_s.strftime('%Y%m%d'), date_e.strftime('%Y%m%d')
+    if ymd_s != ymd_e:
+        fig.text(0.50, 0.02, '%s-%s' % (ymd_s, ymd_e), fontproperties=FONT0)
+    else:
+        fig.text(0.50, 0.02, '%s' % ymd_s, fontproperties=FONT0)
+
+    fig.text(0.8, 0.02, ORG_NAME, fontproperties=FONT0)
+    #---------------
+
+    pb_io.make_sure_path_exists(os.path.dirname(picPath))
+    fig.savefig(picPath)
+    print picPath
+    plt.close()
+    fig.clear()
 
 
 def plot_omb(date_D, a_D, b_D,
@@ -471,6 +573,7 @@ def plot_omb(date_D, a_D, b_D,
 
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     plt.savefig(picPath)
+    print picPath
     fig.clear()
     plt.close()
 
@@ -748,224 +851,6 @@ def add_year_xaxis(ax, xlim_min, xlim_max):
     newax.tick_params(which='both', direction='in')
     set_tick_font(newax)
     newax.xaxis.set_tick_params(length=5)
-
-
-def plot_abc(date_D, a_D, b_D, c_D,
-             date_M, a_M, b_M, c_M,
-             picPath, title,
-             date_s, date_e,
-             slope_min, slope_max,
-             var):
-    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
-    fig = plt.figure(figsize=(6, 6))
-    ax1 = plt.subplot(311)
-    ax2 = plt.subplot(312, sharex=ax1)
-    ax3 = plt.subplot(313, sharex=ax1)
-
-    # format the Xticks
-    xlim_min = pb_time.ymd2date('%04d%02d01' % (date_s.year, date_s.month))
-    xlim_max = date_e
-    ax1.set_xlim(xlim_min, xlim_max)
-
-    # format the Yticks\
-    # Y 轴，坐标轴范围
-    if var == "tbb-tbb" or var == "ref-ref":
-        ax1.set_ylim(slope_min, slope_max)
-        ax1.yaxis.set_major_locator(MultipleLocator(0.01))
-        ax1.yaxis.set_minor_locator(MultipleLocator(0.002))
-    elif var == "dn-ref":
-        ax1.set_ylim(slope_min, slope_max)
-        # 根据要求：dn-ref 的图，ax1 需要有两种坐标范围
-        if slope_max >= 0.00030:
-            ax1.yaxis.set_major_locator(MultipleLocator(0.00010))
-            ax1.yaxis.set_minor_locator(MultipleLocator(0.00002))
-        else:
-            ax1.yaxis.set_major_locator(MultipleLocator(0.00002))
-            ax1.yaxis.set_minor_locator(MultipleLocator(0.000004))
-    if var == "tbb-tbb":
-        ax2.set_ylim(-30, 30)
-        ax2.yaxis.set_major_locator(MultipleLocator(10))
-        ax2.yaxis.set_minor_locator(MultipleLocator(5))
-    elif var == "ref-ref":
-        ax2.set_ylim(-0.1, 0.1)
-        ax2.yaxis.set_major_locator(MultipleLocator(0.02))
-        ax2.yaxis.set_minor_locator(MultipleLocator(0.01))
-    elif var == "dn-ref":
-        ax2.set_ylim(-0.08, 0.08)
-        ax2.yaxis.set_major_locator(MultipleLocator(0.02))
-        ax2.yaxis.set_minor_locator(MultipleLocator(0.01))
-    ax3.set_ylim(0, 7)
-    ax3.yaxis.set_major_locator(MultipleLocator(1))
-    ax3.yaxis.set_minor_locator(MultipleLocator(0.5))
-
-    # plot ax1 -------------------------------------------------
-    plt.sca(ax1)
-    plt.plot(date_D, a_D, 'x', ms=5,
-             markerfacecolor=None, markeredgecolor=BLUE, alpha=0.8,
-             mew=0.3, label='Daily')
-    plt.plot(date_M, a_M, 'o-',
-             ms=4, lw=0.6, c=RED,
-             mew=0, label='Monthly')
-    plt.ylabel('Slope', fontsize=11, fontproperties=FONT0)
-    plt.grid(True)
-    plt.title(title, fontsize=12, fontproperties=FONT0)
-    set_tick_font(ax1)
-    plt.setp(ax1.get_xticklabels(), visible=False)
-
-    # plot ax2 -------------------------------------------------
-    plt.sca(ax2)
-    plt.plot(date_D, b_D, 'x', ms=5,
-             markerfacecolor=None, markeredgecolor=BLUE, alpha=0.8,
-             mew=0.3, label='Daily')
-    plt.plot(date_M, b_M, 'o-',
-             ms=4, lw=0.6, c=RED,
-             mew=0, label='Monthly')
-    plt.ylabel('Intercept', fontsize=11, fontproperties=FONT0)
-    plt.grid(True)
-    set_tick_font(ax2)
-    plt.setp(ax2.get_xticklabels(), visible=False)
-
-    # point number -------------------------------------------------
-    plt.sca(ax3)
-
-    plt.fill_between(date_D, 0, c_D,
-                 edgecolor=BLUE, facecolor=BLUE, alpha=0.6)
-#     plt.fill_between(date_M, 0, c_M,
-#                  edgecolor=RED, facecolor=RED, alpha=0.5)
-#     plt.bar(date_M, c_M, width=1, align='edge',  # "center",
-#             color=RED, linewidth=0)
-    plt.plot(date_M, c_M, 'o-',
-             ms=4, lw=0.6, c=RED,
-             mew=0, label='Monthly')
-    plt.ylabel('Number of sample points\nlog (base = 10)', fontsize=11, fontproperties=FONT0)
-    plt.grid(True)
-    set_tick_font(ax3)
-
-    setXLocator(ax3, xlim_min, xlim_max)
-
-#     circle1 = mpatches.Circle((430, 563), 5, color=BLUE, ec=EDGE_GRAY, lw=0)
-#     circle2 = mpatches.Circle((508, 563), 5, color=RED, ec=EDGE_GRAY, lw=0)
-#     fig.patches.extend([circle1, circle2])
-#
-#     fig.text(0.74, 0.93, 'Daily', color=BLUE, fontproperties=FONT0)
-#     fig.text(0.86, 0.93, 'Monthly', color=RED, fontproperties=FONT0)
-    #---------------
-    plt.tight_layout()
-    fig.subplots_adjust(bottom=0.14)
-
-    circle1 = mpatches.Circle((74, 18), 6, color=BLUE, ec=EDGE_GRAY, lw=0)
-    circle2 = mpatches.Circle((164, 18), 6, color=RED, ec=EDGE_GRAY, lw=0)
-    fig.patches.extend([circle1, circle2])
-
-    fig.text(0.15, 0.02, 'Daily', color=BLUE, fontproperties=FONT0)
-    fig.text(0.3, 0.02, 'Monthly', color=RED, fontproperties=FONT0)
-
-    ymd_s, ymd_e = date_s.strftime('%Y%m%d'), date_e.strftime('%Y%m%d')
-    if ymd_s != ymd_e:
-        fig.text(0.50, 0.02, '%s-%s' % (ymd_s, ymd_e), fontproperties=FONT0)
-    else:
-        fig.text(0.50, 0.02, '%s' % ymd_s, fontproperties=FONT0)
-
-    fig.text(0.8, 0.02, ORG_NAME, fontproperties=FONT0)
-    #---------------
-
-    pb_io.make_sure_path_exists(os.path.dirname(picPath))
-    fig.savefig(picPath)
-    print picPath
-    plt.close()
-    fig.clear()
-
-
-def plot_omb(date_D, a_D, b_D,
-             picPath, title,
-             date_s, date_e):
-    """
-    画偏差时序彩色图
-    """
-    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
-    if (np.isnan(a_D)).all():
-        Log.error('Everything is NaN: %s' % picPath)
-        return
-
-    ylim_min, ylim_max = 210, 330
-    y_res = 0.2
-    x_size = (date_e - date_s).days
-    yy = np.arange(ylim_min, ylim_max, y_res) + y_res / 2.  # 一列的y值
-    grid = np.ones(len(date_D)) * yy.reshape(-1, 1)
-
-    aa = a_D * np.ones((len(grid), 1))
-    bb = b_D * np.ones((len(grid), 1))
-
-    grid = grid - np.divide((grid - bb), aa)
-
-    # zz = np.zeros((len(yy), x_size))  # 2D， 要画的值
-    zz = np.full((len(yy), x_size), -65535)  # 将值填充为 - ，以前填充0
-    zz = np.ma.masked_where(zz == -65535, zz)
-
-    j = 0
-    xx = []  # 一行的x值
-    for i in xrange(x_size):  # 补充缺失数据的天
-        date_i = date_s + relativedelta(days=i)
-        xx.append(date_i)
-        if j < len(date_D) and date_D[j] == date_i:
-            zz[:, i] = grid[:, j]
-            j = j + 1
-
-    fig = plt.figure(figsize=(6, 4))
-    ax = fig.add_subplot(111)
-
-    norm = mpl.colors.Normalize(vmin=-4.0, vmax=4.0)
-    xx = np.array(xx)
-    plt.pcolormesh(xx, yy, zz, cmap='jet', norm=norm, shading='flat', zorder=0)
-    plt.grid(True, zorder=10)
-
-    xlim_min = date_s
-    xlim_max = date_e
-    plt.xlim(xlim_min, xlim_max)
-    plt.ylim(ylim_min, ylim_max)
-    plt.ylabel('TB($K$)', fontsize=11, fontproperties=FONT0)
-
-    # format the ticks
-    setXLocator(ax, xlim_min, xlim_max)
-    set_tick_font(ax)
-
-    # title
-    plt.title(title, fontsize=12, fontproperties=FONT0)
-
-    plt.tight_layout()
-    # --------------------
-    fig.subplots_adjust(bottom=0.25)
-
-    # -------add colorbar ---------
-    fig.canvas.draw()
-    point_bl = ax.get_position().get_points()[0]  # 左下
-    point_tr = ax.get_position().get_points()[1]  # 右上
-    cbar_height = 0.05
-    colorbar_ax = fig.add_axes([point_bl[0] - 0.05, 0.05,
-                                (point_tr[0] - point_bl[0]) / 2.2, cbar_height])
-
-    mpl.colorbar.ColorbarBase(colorbar_ax, cmap='jet',
-                               norm=norm,
-                               orientation='horizontal')
-    # ---font of colorbar-----------
-    for l in colorbar_ax.xaxis.get_ticklabels():
-        l.set_fontproperties(FONT0)
-        l.set_fontsize(9)
-    # ------Time and ORG_NAME----------------
-    ymd_s, ymd_e = date_s.strftime('%Y%m%d'), date_e.strftime('%Y%m%d')
-    if ymd_s != ymd_e:
-        fig.text(0.52, 0.05, '%s-%s' % (ymd_s, ymd_e), fontproperties=FONT0)
-    else:
-        fig.text(0.52, 0.05, '%s' % ymd_s, fontproperties=FONT0)
-
-    fig.text(0.82, 0.05, ORG_NAME, fontproperties=FONT0)
-    # ---------------
-
-    pb_io.make_sure_path_exists(os.path.dirname(picPath))
-    plt.savefig(picPath)
-    print picPath
-    fig.clear()
-    plt.close()
 
 
 ######################### 程序全局入口 ##############################
