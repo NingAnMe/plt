@@ -30,7 +30,7 @@ from plt_io import ReadHDF5, loadYamlCfg
 lock = Lock()
 
 
-def run(pair, ymd, isMonthly):
+def run(pair, ymd, is_monthly):
     """
     pair: sat1+sensor1_sat2+sensor2
     ymd: str YYYYMMDD
@@ -66,7 +66,7 @@ def run(pair, ymd, isMonthly):
         dict_md_n = {}
 
         # 需要回滚的天数
-        if isMonthly:
+        if is_monthly:
             PERIOD = calendar.monthrange(int(ymd[:4]), int(ymd[4:6]))[1]  # 当月天数
             ymd = ymd[:6] + '%02d' % PERIOD  # 当月最后一天
         else:
@@ -100,7 +100,7 @@ def run(pair, ymd, isMonthly):
             elif num_file != PERIOD:
                 Log.error(u"{} of {} file(s) found.".format(num_file, PERIOD))
 
-            if isMonthly:
+            if is_monthly:
                 str_time = ymd[:6]
                 cur_path = os.path.join(MRA_DIR, pair, str_time)
             else:
@@ -243,7 +243,7 @@ def run(pair, ymd, isMonthly):
                                  num_file, part1, part2, chan, str_time,
                                  xname, xname_l, xunit, xmin, xmax,
                                  yname, yname_l, yunit, ymin, ymax,
-                                 diagonal, isMonthly)
+                                 diagonal, is_monthly)
                 if abr:
                     dict_cabr[o_name][chan] = abr
                 else:
@@ -262,13 +262,13 @@ def run(pair, ymd, isMonthly):
                     x_d = x[day_index]
                     y_d = y[day_index]
                     w_d = weight[day_index] if weight is not None else None
-                    print('x, y', len(x), len(y))
+                    print('x_all, y_all', len(x), len(y))
                     print('x_day, y_day', len(x_d), len(y_d))
                     abr, bias = plot(x_d, y_d, w_d, o_file,
                                      num_file, part1, part2, chan, str_time,
                                      xname, xname_l, xunit, xmin, xmax,
                                      yname, yname_l, yunit, ymin, ymax,
-                                     diagonal, isMonthly)
+                                     diagonal, is_monthly)
                     if abr:
                         dict_cabr_d[o_name][chan] = abr
                     else:
@@ -288,13 +288,13 @@ def run(pair, ymd, isMonthly):
                     x_n = x[night_index]
                     y_n = y[night_index]
                     w_n = weight[night_index] if weight is not None else None
-                    print('x, y', len(x), len(y))
+                    print('x_all, y_all', len(x), len(y))
                     print('x_night, y_night', len(x_n), len(y_n))
                     abr, bias = plot(x_n, y_n, w_n, o_file,
                                      num_file, part1, part2, chan, str_time,
                                      xname, xname_l, xunit, xmin, xmax,
                                      yname, yname_l, yunit, ymin, ymax,
-                                     diagonal, isMonthly)
+                                     diagonal, is_monthly)
                     if abr:
                         dict_cabr_n[o_name][chan] = abr
                     else:
@@ -313,24 +313,18 @@ def run(pair, ymd, isMonthly):
         channel = plt_cfg[each]['chan']
         if 'all' in Day_Night:
             for o_name in dict_cabr:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr,
-                         'ALL', isMonthly)
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_md, 'ALL')
                 write_cabr(channel, part1, part2, o_name, ymd,
                            dict_cabr, 'ALL')
         if 'day' in Day_Night:
             for o_name in dict_cabr_d:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_d,
-                         'Day', isMonthly)
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_md_d, 'Day')
                 write_cabr(channel, part1, part2, o_name, ymd,
                            dict_cabr_d, 'Day')
         if 'night' in Day_Night:
             for o_name in dict_cabr_n:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_n,
-                         'Night', isMonthly)
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_md_n, 'Night')
                 write_cabr(channel, part1, part2, o_name, ymd,
@@ -544,85 +538,9 @@ def month_average(day_date, day_data):
     return month_datas
 
 
-def writeTxt(channel, part1, part2, o_name, ymd,
-             dict_cabr, DayOrNight, isMonthly):
-    """
-    生成abr文件
-    ymd: YYYYMMDD or YYYYMM
-    """
-    if len(ymd) == 6:
-        ymd = ymd + '01'
-    if isMonthly:
-        FileName = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
-                                '%s_%s_%s_%s_Monthly.txt' % (
-                                    part1, part2, o_name, DayOrNight))
-    else:
-        FileName = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
-                                '%s_%s_%s_%s_%s.txt' % (
-                                    part1, part2, o_name, DayOrNight, ymd[:4]))
-
-    title_line = 'YMD       '
-    newline = ''
-    for chan in channel:
-        title_line = title_line + '  Count(%s) Slope(%s) Intercept(%s) RSquared(%s)' % (
-            chan, chan, chan, chan)
-        newline = newline + '  %10d  %-10.6f  %-10.6f  %-10.6f' % (
-            tuple(dict_cabr[o_name][chan]))
-    newline = newline + '\n'  # don't forget to end with \n
-
-    allLines = []
-    titleLines = []
-    DICT_TXT = {}
-
-    pb_io.make_sure_path_exists(os.path.dirname(FileName))
-
-    # 写十行头信息
-    titleLines.append('Sat1: %s\n' % part1)
-    titleLines.append('Sat2: %s\n' % part2)
-    if isMonthly:
-        titleLines.append('TimeRange: since launch\n')
-        titleLines.append('           Monthly\n')
-    else:
-        titleLines.append('TimeRange: %s\n' % ymd[:4])
-        titleLines.append('           Daily\n')
-    titleLines.append('Day or Night: %s\n' % DayOrNight)
-    titleLines.append(
-        'Calc time : %s\n' % get_local_time().strftime('%Y.%m.%d %H:%M:%S'))
-    titleLines.append('\n')
-    titleLines.append('\n')
-    titleLines.append(title_line + '\n')
-    titleLines.append('-' * len(title_line) + '\n')
-
-    #
-    if os.path.isfile(FileName) and os.path.getsize(FileName) != 0:
-        fp = open(FileName, 'r')
-        for i in xrange(10):
-            fp.readline()  # 跳过头十行
-        Lines = fp.readlines()
-        fp.close()
-        # 使用字典特性，保证时间唯一，读取数据
-        for Line in Lines:
-            DICT_TXT[Line[:8]] = Line[8:]
-        # 添加或更改数据
-        DICT_TXT[ymd] = newline
-        # 按照时间排序
-        newLines = sorted(DICT_TXT.iteritems(), key=lambda d: d[0],
-                          reverse=False)
-
-        for i in xrange(len(newLines)):
-            allLines.append(str(newLines[i][0]) + str(newLines[i][1]))
-    else:
-        allLines.append(ymd + newline)
-
-    fp = open(FileName, 'w')
-    fp.writelines(titleLines)
-    fp.writelines(allLines)
-    fp.close()
-
-
 def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
          xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax,
-         is_diagonal, isMonthly):
+         is_diagonal, is_monthly):
     plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
 
     # 过滤 正负 delta+8 倍 std 的杂点 ------------------------
@@ -644,7 +562,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     length_rad = len(x)
 
     bias = None  # 当 bias 没有被计算的时候，不输出 bias
-    if not isMonthly and is_diagonal:
+    if not is_monthly and is_diagonal:
         # return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]
         fig = plt.figure(figsize=(14, 4.5))
         fig.subplots_adjust(top=0.92, bottom=0.11, left=0.045, right=0.985)
@@ -830,7 +748,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             axislimit=histogram_axislimit, histogram=histogram_y,
         )
 
-    elif not isMonthly and not is_diagonal:
+    elif not is_monthly and not is_diagonal:
         fig = plt.figure(figsize=(4.5, 4.5))
         fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
         ax1 = plt.subplot2grid((1, 1), (0, 0))
@@ -893,7 +811,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             diagonal=regress_diagonal, regressline=regress_regressline,
             scatter_point=scatter_point,
         )
-    elif isMonthly:
+    elif is_monthly:
         o_file = o_file + "_density"
 
         fig = plt.figure(figsize=(4.5, 4.5))
