@@ -23,7 +23,7 @@ from DV import dv_pub_3d_dev
 from DV.dv_pub_3d_dev import FONT0, bias_information, day_data_write, plt, get_bias_data, get_cabr_data
 from DM.SNO.dm_sno_cross_calc_map import BLUE
 from PB.CSC.pb_csc_console import LogServer
-from PB.pb_time import get_local_time
+from PB.pb_time import get_local_time, is_day_timestamp_and_lon
 from PB import pb_time, pb_io
 from plt_io import ReadHDF5, loadYamlCfg
 
@@ -35,15 +35,18 @@ def run(pair, ymd, isMonthly):
     pair: sat1+sensor1_sat2+sensor2
     ymd: str YYYYMMDD
     """
+    # 提取参数中的卫星信息和传感器信息
     part1, part2 = pair.split('_')
     sat1, sensor1 = part1.split('+')
     sat2, sensor2 = part2.split('+')
 
+    # 判断是静止卫星还是动态卫星
     if 'FY2' in part1 or 'FY4' in part1:
         Type = "GEOLEO"
     elif 'FY3' in part1:
         Type = "LEOLEO"
     else:
+        Log.error('Cant distinguish the satellite type')
         return
 
     # load yaml config file
@@ -52,9 +55,7 @@ def run(pair, ymd, isMonthly):
     if plt_cfg is None:
         return
 
-    Log.info(
-        u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(
-            pair, ymd))
+    Log.info(u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(pair, ymd))
 
     for each in plt_cfg['regression']:
         dict_cabr = {}
@@ -85,16 +86,14 @@ def run(pair, ymd, isMonthly):
             num_file = PERIOD
             for daydelta in xrange(PERIOD):
                 cur_ymd = pb_time.ymd_plus(ymd, -daydelta)
-                hdf5_name = 'COLLOC+%sIR,%s_C_BABJ_%s.hdf5' % (
-                    Type, pair, cur_ymd)
+                hdf5_name = 'COLLOC+%sIR,%s_C_BABJ_%s.hdf5' % (Type, pair, cur_ymd)
                 filefullpath = os.path.join(MATCH_DIR, pair, hdf5_name)
                 if not os.path.isfile(filefullpath):
                     Log.info(u"File not found: {}".format(filefullpath))
                     num_file -= 1
                     continue
                 if not oneHDF5.LoadData(filefullpath, chan):
-                    Log.error('Error occur when reading %s of %s' % (
-                        chan, filefullpath))
+                    Log.error('Error occur when reading %s of %s' % (chan, filefullpath))
             if num_file == 0:
                 Log.error(u"No file found.")
                 continue
@@ -109,8 +108,7 @@ def run(pair, ymd, isMonthly):
                 cur_path = os.path.join(DRA_DIR, pair, str_time)
 
             # delete 0 in std
-            if len(
-                    oneHDF5.rad1_std) > 0.0001:  # TODO: 有些极小的std可能是异常值，而导致权重极大，所以 std>0 改成 std>0.0001
+            if len(oneHDF5.rad1_std) > 0.0001:  # TODO: 有些极小的std可能是异常值，而导致权重极大，所以 std>0 改成 std>0.0001
                 deletezeros = np.where(oneHDF5.rad1_std > 0.0001)
                 oneHDF5.rad1_std = oneHDF5.rad1_std[deletezeros]
                 oneHDF5.rad1 = oneHDF5.rad1[deletezeros] if len(
@@ -123,6 +121,10 @@ def run(pair, ymd, isMonthly):
                     oneHDF5.tbb2) > 0 else oneHDF5.tbb2
                 oneHDF5.time = oneHDF5.time[deletezeros] if len(
                     oneHDF5.time) > 0 else oneHDF5.time
+                oneHDF5.lon1 = oneHDF5.lon1[deletezeros] if len(
+                    oneHDF5.lon1) > 0 else oneHDF5.lon1
+                oneHDF5.lon2 = oneHDF5.lon2[deletezeros] if len(
+                    oneHDF5.lon2) > 0 else oneHDF5.lon2
             if len(oneHDF5.ref1_std) > 0.0001:
                 deletezeros = np.where(oneHDF5.ref1_std > 0.0001)
                 oneHDF5.ref1_std = oneHDF5.ref1_std[deletezeros]
@@ -132,15 +134,19 @@ def run(pair, ymd, isMonthly):
                     oneHDF5.ref2) > 0 else oneHDF5.ref2
                 oneHDF5.dn1 = oneHDF5.dn1[deletezeros] if len(
                     oneHDF5.dn1) > 0 else oneHDF5.dn1
+                oneHDF5.dn2 = oneHDF5.dn1[deletezeros] if len(
+                    oneHDF5.dn2) > 0 else oneHDF5.dn2
                 oneHDF5.time = oneHDF5.time[deletezeros] if len(
                     oneHDF5.time) > 0 else oneHDF5.time
+                oneHDF5.lon1 = oneHDF5.lon1[deletezeros] if len(
+                    oneHDF5.lon1) > 0 else oneHDF5.lon1
+                oneHDF5.lon2 = oneHDF5.lon2[deletezeros] if len(
+                    oneHDF5.lon2) > 0 else oneHDF5.lon2
 
             # find out day and night
-            if ('day' in Day_Night or 'night' in Day_Night) and len(
-                    oneHDF5.time) > 0:
-                jd = oneHDF5.time / 24. / 3600.  # jday from 1993/01/01 00:00:00
-                hour = ((jd - jd.astype('int8')) * 24).astype('int8')
-                day_index = (hour < 10)  # utc hour<10 is day
+            if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
+                vect_is_day = np.vectorize(is_day_timestamp_and_lon)
+                day_index = vect_is_day(oneHDF5.time, oneHDF5.lon1)
                 night_index = np.logical_not(day_index)
             else:
                 day_index = None
@@ -213,8 +219,9 @@ def run(pair, ymd, isMonthly):
                 dict_cabr_n[o_name] = {}
                 dict_md_n[xname] = {}
 
-            if x.size < 10:
-                Log.error("Not enough match point to draw.")
+            # 对样本点数量进行判断，如果样本点少于 100 个，则不进行绘制
+            if x.size < 100:
+                Log.error("Not enough match point to draw: {}, {}".format(each, chan))
                 if 'all' in Day_Night:
                     dict_cabr[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_md[xname][chan] = np.NaN
@@ -1020,7 +1027,8 @@ if __name__ == "__main__":
     Log = LogServer(LogPath)
 
     # 开启进程池
-    threadNum = inCfg['CROND']['threads']
+    # threadNum = inCfg['CROND']['threads']
+    threadNum = '10'
     pool = Pool(processes=int(threadNum))
 
     if len(args) == 2:
@@ -1041,9 +1049,9 @@ if __name__ == "__main__":
         args_List = []
 
         while date_s <= date_e:
-            ymd = date_s.strftime('%Y%m%d')
-            # run(satPair, ymd, isMonthly)
-            pool.apply_async(run, (satPair, ymd, isMonthly))
+            ymd_day = date_s.strftime('%Y%m%d')
+            # run(satPair, ymd_day, isMonthly)
+            pool.apply_async(run, (satPair, ymd_day, isMonthly))
             date_s = date_s + timeStep
 
         pool.close()
@@ -1060,17 +1068,17 @@ if __name__ == "__main__":
                 continue
             for rdays in rolldays:
                 isMonthly = False
-                ymd = (datetime.utcnow() - relativedelta(
+                ymd_day = (datetime.utcnow() - relativedelta(
                     days=int(rdays))).strftime('%Y%m%d')
-                pool.apply_async(run, (satPair, ymd, isMonthly))
+                pool.apply_async(run, (satPair, ymd_day, isMonthly))
             # 增加一个月的作业,默认当前月和上一个月
             isMonthly = True
-            ymd = (datetime.utcnow() - relativedelta(
+            ymd_month = (datetime.utcnow() - relativedelta(
                 days=int(rolldays[0]))).strftime('%Y%m%d')
-            ymdLast = (datetime.utcnow() - relativedelta(months=1)).strftime(
+            ymd_last_month = (datetime.utcnow() - relativedelta(months=1)).strftime(
                 '%Y%m%d')
-            pool.apply_async(run, (satPair, ymd, isMonthly))
-            pool.apply_async(run, (satPair, ymdLast, isMonthly))
+            pool.apply_async(run, (satPair, ymd_month, isMonthly))
+            pool.apply_async(run, (satPair, ymd_last_month, isMonthly))
 
         pool.close()
         pool.join()
