@@ -4,7 +4,7 @@ Created on 2018年4月20日
 读取 abr 和 rmd 的 txt 文件，画时间序列图
 包括 abc, tbbias, rmd, omb 四种图
 
-@author: zhangtao, anning
+@author: anning
 """
 import os, sys
 from configobj import ConfigObj
@@ -15,114 +15,13 @@ from PB.CSC.pb_csc_console import LogServer
 from DV.dv_pub_legacy import plt, mdates, set_tick_font, FONT0
 
 from DV import dv_pub_3d_dev
-from DV.dv_pub_3d_dev import get_bias_data
+from DV.dv_pub_3d_dev import get_bias_data, get_cabr_data
 from datetime import datetime
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 from matplotlib.ticker import MultipleLocator
 from dateutil.relativedelta import relativedelta
 from multiprocessing import Pool , Lock
 from plt_io import loadYamlCfg
-
-
-class coeff_abr(object):
-
-    def __init__(self, pair):
-        self.pair = pair
-        self.path = os.path.join(ABR_DIR, pair)
-        self.error = False
-
-        # yaml config file
-        sensor1 = (pair.split('_')[0]).split('+')[1]
-        sensor2 = (pair.split('_')[1]).split('+')[1]
-
-        # load yaml config file
-        plt_cfg_file = os.path.join(MainPath, '%s_%s_3d.yaml' % (sensor1, sensor2))
-        self.plt_cfg = loadYamlCfg(plt_cfg_file)
-        if self.plt_cfg is None:
-            self.error = True
-
-    def loadCoeff(self, physical_pair, oname, DayOrNight):
-        """
-        load Monthly coeff to self.Coeff_M
-        load Daily coeff to self.Coeff_D
-        args:
-        oname: for now must be 'TBBCalCoeff', in future plan may add 'RadCalCoeff'
-        DayOrNight: ALL, Day, Night
-        """
-        if not os.path.isdir(self.path):
-            self.error = True
-            return
-
-        flst = [e for e in os.listdir(self.path) if '%s_%s_%s_' % (self.pair, oname, DayOrNight) in e]
-
-        fname = '%s_%s_%s_Monthly.txt' % (self.pair, oname, DayOrNight)
-        self.Coeff_M = None
-        if fname in flst:
-            flst.pop(flst.index(fname))
-            self.Coeff_M = self.__loadCoeffTxt_M(physical_pair, fname)
-        else:
-            Log.error('No Monthly Coeff TXT %s' % fname)
-            self.error = True
-
-        self.Coeff_D = self.__loadCoeffTxt_D(physical_pair, flst)
-
-    def __loadCoeffTxt_M(self, physical_pair, fname):
-        """
-        read txt, return ndarray
-        """
-        retAry = None
-        names = ['date']
-        formats = ['object']
-        for chan in self.plt_cfg[physical_pair]['chan']:
-            names = names + ['c_%s' % chan, 'a_%s' % chan, 'b_%s' % chan, 'r_%s' % chan]
-            formats = formats + ['i4', 'f4', 'f4', 'f4']
-
-        convert = lambda x: datetime.strptime(x[:6] + '15', "%Y%m%d")  # 画点在15号
-        fpath = os.path.join(self.path, fname)
-
-        ary = np.loadtxt(fpath,
-              converters={0:convert},
-              dtype={'names': tuple(names),
-                     'formats': tuple(formats)},
-              skiprows=10, ndmin=1)
-        if len(ary) == 0:
-            pass
-        elif len(ary[0]) == 0:
-            pass
-        else:
-            retAry = ary
-
-        return retAry
-
-    def __loadCoeffTxt_D(self, physical_pair, fnameLst):
-        """
-        read txt, return ndarray
-        """
-        retAry = None
-        names = ['date']
-        formats = ['object']
-        for chan in self.plt_cfg[physical_pair]['chan']:
-            names = names + ['c_%s' % chan, 'a_%s' % chan, 'b_%s' % chan, 'r_%s' % chan]
-            formats = formats + ['i4', 'f4', 'f4', 'f4']
-
-        convert = lambda x: datetime.strptime(x, "%Y%m%d")
-        fnameLst.sort()
-        for eachtxt in fnameLst:
-            fpath = os.path.join(self.path, eachtxt)
-            ary = np.loadtxt(fpath,
-                  converters={0:convert},
-                  dtype={'names': tuple(names),
-                         'formats': tuple(formats)},
-                  skiprows=10, ndmin=1)
-            if len(ary) == 0: continue
-            if len(ary[0]) == 0: continue
-
-            if retAry is None:
-                retAry = ary
-            else:
-                retAry = np.concatenate((retAry, ary), axis=0)  # 合并多天的数据
-
-        return retAry
 
 
 def run(pair, date_s, date_e):
@@ -133,18 +32,38 @@ def run(pair, date_s, date_e):
     date_e: datetime of end date
             None  处理 从发星 到 有数据的最后一天
     """
-    isLaunch = False
-    if date_s is None or date_e is None:
-        isLaunch = True
+    # 提取参数中的卫星信息和传感器信息
     part1, part2 = pair.split('_')
     sat1, sensor1 = part1.split('+')
     sat2, sensor2 = part2.split('+')
+
+    # 判断是否从发星开始处理
+    if date_s is None or date_e is None:
+        isLaunch = True
+    elif date_s is not None and date_e is not None:
+        isLaunch = False
+    else:
+        Log.error('Wrong date argument')
+        return
+
+    # 设置开始时间和结束时间
+    if isLaunch:
+        if sat1 in inCfg['LUANCH_DATE']:
+            date_s = pb_time.ymd2date(str(inCfg['LUANCH_DATE'][sat1]))
+            date_e = datetime.utcnow()
+        else:
+            Log.error('%s not in LUANCH_DATE of Cfg, use the first day in txt instead.')
+            return
+    ymd_s, ymd_e = date_s.strftime('%Y%m%d'), date_e.strftime('%Y%m%d')
 
     # load yaml config file
     plt_cfg_file = os.path.join(MainPath, '%s_%s_3d.yaml' % (sensor1, sensor2))
     plt_cfg = loadYamlCfg(plt_cfg_file)
     if plt_cfg is None:
+        Log.error('yaml config file is not exist: {}'.format(plt_cfg_file))
         return
+
+    Log.info(u"----- Start Drawing Regression-Pic, PAIR: {} -----".format(pair))
 
     for each in plt_cfg['time_series']:
         # must be in 'all', 'day', 'night'
@@ -154,10 +73,6 @@ def run(pair, date_s, date_e):
             for i in Day_Night:
                 if i not in ['all', 'day', 'night']:
                     Day_Night.remove(i)
-
-        co = coeff_abr(pair)
-        if co.error:
-            return
 
         # 将每个对通用的属性值放到对循环，每个通道用到的属性值放到通道循环
         xname, yname = each.split('-')
@@ -182,34 +97,31 @@ def run(pair, date_s, date_e):
             else:
                 DayOrNight = DayOrNight[0].upper() + DayOrNight[1:]
 
-            co.loadCoeff(each, o_name, DayOrNight)
-            if co.error: continue
-            date_D = co.Coeff_D['date']
-            date_M = co.Coeff_M['date']
-            if isLaunch:
-                if sat1 in inCfg['LUANCH_DATE']:
-                    date_s = pb_time.ymd2date(str(inCfg['LUANCH_DATE'][sat1]))
-                else:
-                    Log.error('%s not in LUANCH_DATE of Cfg, use the first day in txt instead.')
-                    date_s = date_D[0]
-                date_e = date_D[-1]
-
-            ymd_s, ymd_e = date_s.strftime('%Y%m%d'), date_e.strftime('%Y%m%d')
-            Log.info(u"----- Start Drawing ABC TBBias Pic, {}, PAIR: {}, YMD: {}-{}: " \
-                     u"{}-----".format(each, pair, ymd_s, ymd_e, DayOrNight))
-
-            idx_D = np.where(np.logical_and(date_D >= date_s, date_D <= date_e))
-            idx_M = np.where(np.logical_and(date_M >= pb_time.ymd2date(ymd_s[:6] + '01'), date_M <= date_e))
-
             for i, chan in enumerate(plt_cfg[each]['chan']):
-                a_D = co.Coeff_D['a_%s' % chan]
-                b_D = co.Coeff_D['b_%s' % chan]
-                c_D = np.log10(co.Coeff_D['c_%s' % chan])
-                a_M = co.Coeff_M['a_%s' % chan]
-                b_M = co.Coeff_M['b_%s' % chan]
-                c_M = np.log10(co.Coeff_M['c_%s' % chan])
                 # plot slope Intercept count ------------------------
                 print "plot abc : {} {} {}".format(each, DayOrNight, chan)
+
+                abc_path = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
+                                                 "CABR")
+                abc_daily_file = os.path.join(abc_path, '%s_%s_%s_%s_%s_Daily.txt' % (
+                    part1, part2, o_name, chan, DayOrNight))
+                abc_monthly_file = os.path.join(abc_path, '%s_%s_%s_%s_%s_Monthly.txt' % (
+                    part1, part2, o_name, chan, DayOrNight))
+                abc_day_data = get_cabr_data(abc_daily_file)
+                abc_month_data = get_cabr_data(abc_monthly_file)
+
+                date_D = abc_day_data["date"]
+                a_D = abc_day_data["slope"]
+                b_D = abc_day_data["intercept"]
+                c_D = np.log10(abc_day_data["count"])
+                date_M = abc_month_data["date"] + relativedelta(days=14)
+                a_M = abc_month_data["slope"]
+                b_M = abc_month_data["intercept"]
+                c_M = np.log10(abc_month_data["count"])
+
+                idx_D = np.where(np.logical_and(date_D >= date_s, date_D <= date_e))
+                idx_M = np.where(np.logical_and(date_M >= pb_time.ymd2date(ymd_s[:6] + '01'), date_M <= date_e))
+
                 title = 'Time Series of Slope Intercept & Counts  %s  %s\n(%s = Slope * %s + Intercept)' % \
                         (chan, DayOrNight,
                          part1.replace('+', '_'),
@@ -255,13 +167,8 @@ def run(pair, date_s, date_e):
                     date_rmd_m = date_rmd_m + relativedelta(days=14)
                     data_rmd_m = rmd_m["bias"]
                     std_rmd_m = rmd_m["std"]
-                    idx_d = np.where(
-                        np.logical_and(date_rmd_d >= date_s,
-                                       date_rmd_d <= date_e))
-                    idx_m = np.where(
-                        np.logical_and(
-                            date_rmd_m >= pb_time.ymd2date(ymd_s[:6] + '01'),
-                            date_rmd_m <= date_e))
+                    idx_d = np.where(np.logical_and(date_rmd_d >= date_s, date_rmd_d <= date_e))
+                    idx_m = np.where(np.logical_and(date_rmd_m >= pb_time.ymd2date(ymd_s[:6] + '01'), date_rmd_m <= date_e))
 
                     # 根据拟合系数进行绘制
                     reference_list = plt_cfg[each]['reference'][i]
@@ -310,18 +217,12 @@ def run(pair, date_s, date_e):
                     date_tbbias_m = date_tbbias_m + relativedelta(days=14)
                     data_tbbias_m = tbbias_m["bias"]
                     std_tbbias_m = tbbias_m["std"]
-                    idx_d = np.where(
-                        np.logical_and(date_tbbias_d >= date_s,
-                                       date_tbbias_d <= date_e))
-                    idx_m = np.where(
-                        np.logical_and(
-                            date_tbbias_m >= pb_time.ymd2date(ymd_s[:6] + '01'),
-                            date_tbbias_m <= date_e))
+                    idx_d = np.where(np.logical_and(date_tbbias_d >= date_s, date_tbbias_d <= date_e))
+                    idx_m = np.where(np.logical_and(date_tbbias_m >= pb_time.ymd2date(ymd_s[:6] + '01'), date_tbbias_m <= date_e))
 
                     # 根据拟合系数进行绘制
                     reference_list = plt_cfg[each]['reference'][i]
                     for ref_temp in reference_list:
-                        # ref_temp_f = float(ref_temp)
                         if isLaunch:
                             pic_path = os.path.join(
                                 OMB_DIR, pair, '%s_TBBias_%s_%s_Launch_%dK.png' % (
@@ -439,7 +340,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
     plt.sca(ax3)
 
     plt.fill_between(date_D, 0, c_D,
-                 edgecolor=BLUE, facecolor=BLUE, alpha=0.6)
+                     edgecolor=BLUE, facecolor=BLUE, alpha=0.6)
 #     plt.fill_between(date_M, 0, c_M,
 #                  edgecolor=RED, facecolor=RED, alpha=0.5)
 #     plt.bar(date_M, c_M, width=1, align='edge',  # "center",
@@ -459,7 +360,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
 #
 #     fig.text(0.74, 0.93, 'Daily', color=BLUE, fontproperties=FONT0)
 #     fig.text(0.86, 0.93, 'Monthly', color=RED, fontproperties=FONT0)
-    #---------------
+    # ---------------
     plt.tight_layout()
     fig.subplots_adjust(bottom=0.14)
 
@@ -477,7 +378,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
         fig.text(0.50, 0.02, '%s' % ymd_s, fontproperties=FONT0)
 
     fig.text(0.8, 0.02, ORG_NAME, fontproperties=FONT0)
-    #---------------
+    # ---------------
 
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     fig.savefig(picPath)
@@ -894,8 +795,8 @@ if len(args) == 2:
     Log.info(u'手动长时间序列绘图程序开始运行-----------------------------')
     satPair = args[0]
     str_time = args[1]
-    date_s, date_e = pb_time.arg_str2date(str_time)
-    run(satPair, date_s, date_e)
+    date_start, date_end = pb_time.arg_str2date(str_time)
+    run(satPair, date_start, date_end)
     Log.info(u'SUCCESS，手动长时间序列绘图程序-----------------------------')
 
 elif len(args) == 1:
@@ -916,10 +817,10 @@ elif len(args) == 0:
             continue
 
         for rdays in rolldays:
-            date1 = datetime.utcnow() - relativedelta(days=int(rdays))
-            dateYearAgo = date1 - relativedelta(years=1)
+            date_end = datetime.utcnow() - relativedelta(days=int(rdays))
+            dateYearAgo = date_end - relativedelta(years=1)
             # 处理一年的时间序列
-            pool.apply_async(run, (satPair, dateYearAgo, date1))
+            pool.apply_async(run, (satPair, dateYearAgo, date_end))
         # 处理发星以来的时间序列
         pool.apply_async(run, (satPair, None, None))
     pool.close()
