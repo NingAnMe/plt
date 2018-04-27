@@ -12,7 +12,7 @@ import numpy as np
 from scipy import stats
 import matplotlib as mpl
 
-mpl.use('Agg')  # 必须加这个字段，否则引用 pyplot 服务器会报错，服务器上面没有 TK 框架
+mpl.use("Agg")  # 必须加这个字段，否则引用 pyplot 服务器会报错，服务器上面没有 TK
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -20,16 +20,16 @@ from matplotlib.ticker import MultipleLocator
 from matplotlib.font_manager import FontProperties
 
 
-def get_ds_font(fontName='OpenSans-Regular.ttf'):
+def get_ds_font(fontName="OpenSans-Regular.ttf"):
     """
     载入字体
-    'OpenSans-Regular.ttf'
-    'simhei.ttf'
-    '微软雅黑.ttf'
+    "OpenSans-Regular.ttf"
+    "simhei.ttf"
+    "微软雅黑.ttf"
     """
     selfpath = os.path.split(os.path.realpath(__file__))[0]
     font0 = FontProperties()
-    font_path = os.path.join(selfpath, 'FNT', fontName)
+    font_path = os.path.join(selfpath, "FNT", fontName)
     if os.path.isfile(font_path):
         font0.set_file(font_path)
         return font0
@@ -38,7 +38,7 @@ def get_ds_font(fontName='OpenSans-Regular.ttf'):
 
 FONT0 = get_ds_font()
 FONT1 = get_ds_font()
-FONT_MONO = get_ds_font('DroidSansMono.ttf')
+FONT_MONO = get_ds_font("DroidSansMono.ttf")
 
 
 def set_tick_font(ax, scale_size=10):
@@ -57,12 +57,12 @@ def add_title(titledict):
     """
     添加大标题和xy轴名称
     """
-    tt = plt.title(titledict['title'], fontsize=11, fontproperties=FONT0)
+    tt = plt.title(titledict["title"], fontsize=11, fontproperties=FONT0)
     tt.set_y(1.01)  # set gap space below title and subplot
-    if 'xlabel' in titledict.keys() and titledict['xlabel'] != '':
-        plt.xlabel(titledict['xlabel'], fontsize=11, fontproperties=FONT0)
-    if 'ylabel' in titledict.keys() and titledict['ylabel'] != '':
-        plt.ylabel(titledict['ylabel'], fontsize=11, fontproperties=FONT0)
+    if "xlabel" in titledict.keys() and titledict["xlabel"] != "":
+        plt.xlabel(titledict["xlabel"], fontsize=11, fontproperties=FONT0)
+    if "ylabel" in titledict.keys() and titledict["ylabel"] != "":
+        plt.ylabel(titledict["ylabel"], fontsize=11, fontproperties=FONT0)
 
 
 def add_label(ax, label, local, fontsize=11, fontproperties=FONT0):
@@ -83,11 +83,11 @@ def add_label(ax, label, local, fontsize=11, fontproperties=FONT0):
         ax.set_ylabel(label, fontsize=fontsize, fontproperties=fontproperties)
 
 
-def add_annotate(ax, strlist, local, color='#303030', fontsize=11):
+def add_annotate(ax, strlist, local, color="#303030", fontsize=11):
     """
     添加上方注释文字
-    loc must be 'left' or 'right'
-    格式 ['annotate1', 'annotate2']
+    loc must be "left" or "right"
+    格式 ["annotate1", "annotate2"]
     """
     if strlist is None:
         return
@@ -100,22 +100,22 @@ def add_annotate(ax, strlist, local, color='#303030', fontsize=11):
 
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    if local == 'left':
+    if local == "left":
         ax.text(xlim[0] + x_toedge, ylim[1] - y_toedge,
-                '\n'.join(strlist), ha=local, va='top', color=color,
+                "\n".join(strlist), ha=local, va="top", color=color,
                 fontsize=fontsize, fontproperties=FONT_MONO)
 
-    elif local == 'right':
+    elif local == "right":
         ax.text(xlim[1] - x_toedge, ylim[1] - y_toedge,
-                '\n'.join(strlist), ha=local, va='top', color=color,
+                "\n".join(strlist), ha=local, va="top", color=color,
                 fontsize=fontsize, fontproperties=FONT_MONO)
 
 
-def add_annotate_bak(ax, strlist, loc, color='#303030', fontsize=11):
+def add_annotate_bak(ax, strlist, loc, color="#303030", fontsize=11):
     """
     添加上方注释文字
-    loc must be 'left' or 'right'
-    格式[['annotate1', 'annotate2']]
+    loc must be "left" or "right"
+    格式[["annotate1", "annotate2"]]
     """
     if strlist is None:
         return
@@ -128,16 +128,16 @@ def add_annotate_bak(ax, strlist, loc, color='#303030', fontsize=11):
 
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    if loc == 'left':
+    if loc == "left":
         for eachCol in strlist:
             ax.text(xlim[0] + x_toedge, ylim[1] - y_toedge,
-                    '\n'.join(eachCol), ha=loc, va='top', color=color,
+                    "\n".join(eachCol), ha=loc, va="top", color=color,
                     fontsize=fontsize, fontproperties=FONT_MONO)
             x_toedge = x_toedge + x_step * 1.4
-    elif loc == 'right':
+    elif loc == "right":
         for eachCol in strlist:
             ax.text(xlim[1] - x_toedge, ylim[1] - y_toedge,
-                    '\n'.join(eachCol), ha=loc, va='top', color=color,
+                    "\n".join(eachCol), ha=loc, va="top", color=color,
                     fontsize=fontsize, fontproperties=FONT_MONO)
             x_toedge = x_toedge + x_step * 1.4
 
@@ -156,7 +156,7 @@ def day_data_write(title, data, outFile):
         os.makedirs(FilePath)
 
     if os.path.isfile(outFile) and os.path.getsize(outFile) != 0:
-        fp = open(outFile, 'r')
+        fp = open(outFile, "r")
         fp.readline()
         Lines = fp.readlines()
         fp.close()
@@ -171,12 +171,12 @@ def day_data_write(title, data, outFile):
         newLines = sorted(DICT_D.iteritems(), key=lambda d: d[0], reverse=False)
         for i in xrange(len(newLines)):
             allLines.append(str(newLines[i][0]) + str(newLines[i][1]))
-        fp = open(outFile, 'w')
+        fp = open(outFile, "w")
         fp.write(title)
         fp.writelines(allLines)
         fp.close()
     else:
-        fp = open(outFile, 'w')
+        fp = open(outFile, "w")
         fp.write(title)
         fp.writelines(data)
         fp.close()
@@ -221,20 +221,20 @@ def get_cabr_data(cbar_file):
     :return:
     """
     try:
-        names = ('date', 'count', 'slope', "intercept", "rsquared")
-        formats = ('object', 'i4', 'f4', "f4", "f4")
+        names = ("date", "count", "slope", "s_std", "intercept", "i_std", "rsquared", "r_std")
+        formats = ("object", "i4", "f4", "f4", "f4", "f4", "f4", "f4")
         data = np.loadtxt(cbar_file,
                           converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                          dtype={'names': names,
-                                 'formats': formats},
+                          dtype={"names": names,
+                                 "formats": formats},
                           skiprows=1, ndmin=1)
     except IndexError:
-        names = ('date', 'count', 'slope', "intercept", "rsquared")
-        formats = ('object', 'i4', 'f4', "f4", "f4")
+        names = ("date", "count", "slope", "intercept", "rsquared")
+        formats = ("object", "i4", "f4", "f4", "f4")
         data = np.loadtxt(cbar_file,
                           converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                          dtype={'names': names,
-                                 'formats': formats},
+                          dtype={"names": names,
+                                 "formats": formats},
                           skiprows=1, ndmin=1)
 
     return data
@@ -247,20 +247,20 @@ def get_bias_data(md_file):
     :return:
     """
     try:
-        names = ('date', 'bias', 'std')
-        formats = ('object', 'f4', 'f4')
+        names = ("date", "bias", "std")
+        formats = ("object", "f4", "f4")
         data = np.loadtxt(md_file,
                           converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                          dtype={'names': names,
-                                 'formats': formats},
+                          dtype={"names": names,
+                                 "formats": formats},
                           skiprows=1, ndmin=1)
     except IndexError:
-        names = ('date', 'bias',)
-        formats = ('object', 'f4')
+        names = ("date", "bias",)
+        formats = ("object", "f4")
         data = np.loadtxt(md_file,
                           converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
-                          dtype={'names': names,
-                                 'formats': formats},
+                          dtype={"names": names,
+                                 "formats": formats},
                           skiprows=1, ndmin=1)
 
     return data
@@ -322,25 +322,25 @@ def set_x_locator(ax, xlim_min, xlim_max):
     if day_range <= 60:
         days = mdates.DayLocator(interval=(day_range / 6))
         ax.xaxis.set_major_locator(days)
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
     else:
         month_range = day_range / 30
         if month_range <= 12.:
             months = mdates.MonthLocator()  # every month
             ax.xaxis.set_major_locator(months)
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
         elif month_range <= 24.:
             months = mdates.MonthLocator(interval=2)
             ax.xaxis.set_major_locator(months)
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
         elif month_range <= 48.:
             months = mdates.MonthLocator(interval=4)
             ax.xaxis.set_major_locator(months)
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
         else:
             years = mdates.YearLocator()
             ax.xaxis.set_major_locator(years)
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
 
         if month_range <= 48:
             add_year_xaxis(ax, xlim_min, xlim_max)
@@ -357,15 +357,15 @@ def add_year_xaxis(ax, xlim_min, xlim_max):
     newax.set_frame_on(True)
     newax.grid(False)
     newax.patch.set_visible(False)
-    newax.xaxis.set_ticks_position('bottom')
-    newax.xaxis.set_label_position('bottom')
+    newax.xaxis.set_ticks_position("bottom")
+    newax.xaxis.set_label_position("bottom")
     newax.set_xlim(xlim_min, xlim_max)
     newax.xaxis.set_major_locator(mdates.YearLocator())
-    newax.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
-    newax.spines['bottom'].set_position(('outward', 20))
-    newax.spines['bottom'].set_linewidth(0.6)
+    newax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+    newax.spines["bottom"].set_position(("outward", 20))
+    newax.spines["bottom"].set_linewidth(0.6)
 
-    newax.tick_params(which='both', direction='in')
+    newax.tick_params(which="both", direction="in")
     set_tick_font(newax)
     newax.xaxis.set_tick_params(length=5)
 
@@ -410,7 +410,7 @@ def draw_regression(ax, x, y, label=None, ax_annotate=None,
 
     # 画对角线
     if diagonal is not None:
-        diagonal_color = '#808080'
+        diagonal_color = "#808080"
         diagonal_linewith = 1.2
         ax.plot([xmin, xmax], [ymin, ymax], color=diagonal_color,
                 linewidth=diagonal_linewith)
@@ -429,8 +429,8 @@ def draw_regression(ax, x, y, label=None, ax_annotate=None,
     # 画散点
     if scatter_point is not None:
         alpha_value = 0.8  # 透明度
-        marker_value = 'o'  # 形状
-        color_value = 'b'  # 颜色
+        marker_value = "o"  # 形状
+        color_value = "b"  # 颜色
         ax.scatter(x, y, s=5, marker=marker_value, c=color_value, lw=0,
                    alpha=alpha_value)
 
@@ -480,7 +480,7 @@ def draw_regression(ax, x, y, label=None, ax_annotate=None,
                 MultipleLocator(
                     (yticklocs[1] - yticklocs[0]) / minor_locator_y))
 
-    # 注释，格式 ['annotate1', 'annotate2']
+    # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
         font_size = 10
         add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
@@ -546,8 +546,8 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
         delta = x - y  # 计算偏差
         scatter_size = scatter_delta.get("scatter_size")  # 大小
         scatter_alpha = 0.8  # 透明度
-        scatter_marker = 'o'  # 形状
-        scatter_color = 'b'  # 颜色
+        scatter_marker = "o"  # 形状
+        scatter_color = "b"  # 颜色
         ax.scatter(x, delta, s=scatter_size, marker=scatter_marker,
                    c=scatter_color, lw=0, alpha=scatter_alpha)
 
@@ -560,7 +560,7 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
         regressline_x = [xmin, xmax]
         regressline_y = [xmin * delta_a + delta_b, xmax * delta_a + delta_b]
 
-        regressline_color = 'r'
+        regressline_color = "r"
         regressline_width = 1.2
 
         ax.plot(regressline_x, regressline_y,
@@ -574,7 +574,7 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
         fill_step = background_fill.get("fill_step")
         T_seg, mean_seg, std_seg, sampleNums = get_bar_data(x, delta, xmin,
                                                             xmax, fill_step)
-        ax.plot(T_seg, mean_seg, 'o-',
+        ax.plot(T_seg, mean_seg, "o-",
                 ms=6, lw=0.6, c=fill_color,
                 mew=0, zorder=50)
         ax.fill_between(T_seg, mean_seg - std_seg, mean_seg + std_seg,
@@ -627,7 +627,7 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
                 MultipleLocator(
                     (yticklocs[1] - yticklocs[0]) / minor_locator_y))
 
-    # 注释，格式 ['annotate1', 'annotate2']
+    # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
         font_size = 10
         add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
@@ -681,10 +681,10 @@ def draw_histogram(ax, x, label=None, ax_annotate=None,
         hist_label = histogram.get("label")
         hist_bins = histogram.get("bins")
 
-        ax.hist(x, hist_bins, range=(xmin, xmax), histtype='bar',
+        ax.hist(x, hist_bins, range=(xmin, xmax), histtype="bar",
                 color=hist_color,
                 label=hist_label, alpha=hist_alpha)
-        ax.legend(prop={'size': 10})
+        ax.legend(prop={"size": 10})
 
     # 设定x y 轴的范围
     ax.set_xlim(xmin, xmax)
@@ -719,7 +719,7 @@ def draw_histogram(ax, x, label=None, ax_annotate=None,
                 MultipleLocator(
                     (yticklocs[1] - yticklocs[0]) / minor_locator_y))
 
-    # 注释，格式 ['annotate1', 'annotate2']
+    # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
         font_size = 10
         add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
@@ -812,10 +812,10 @@ def draw_bar(ax, x, y, label=None, ax_annotate=None,
         for i, T in enumerate(T_seg):
             if sampleNums[i] > 0:
                 plt.text(T, np.log10(sampleNums[i]) + 0.2,
-                         '%d' % int(sampleNums[i]), ha="center",
+                         "%d" % int(sampleNums[i]), ha="center",
                          fontsize=6, fontproperties=FONT_MONO)
 
-    # 注释，格式 ['annotate1', 'annotate2']
+    # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
         font_size = 10
         add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
@@ -927,7 +927,7 @@ def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
     # 添加 x 轴年月标签文字
     set_x_locator(ax, xmin, xmax)
 
-    # 注释，格式 ['annotate1', 'annotate2']
+    # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
         font_size = 10
         add_annotate(ax, ax_annotate.get("left"), "left",
