@@ -890,7 +890,7 @@ def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
         y1_fill = background_fill.get("y1")
         ax.fill_between(x_fill, y_fill, y1_fill,
                         facecolor=fill_color, edgecolor=fill_color,
-                        interpolate=True, alpha=0.2, zorder=80)
+                        interpolate=True, alpha=0.1, zorder=80)
 
     # 设定x y 轴的范围
     ax.set_xlim(xmin, xmax)
