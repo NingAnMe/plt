@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.ticker import MultipleLocator
 from matplotlib.font_manager import FontProperties
+from mpl_toolkits.basemap import Basemap
 
 
 def get_ds_font(fontName="OpenSans-Regular.ttf"):
@@ -247,22 +248,21 @@ def get_bias_data(md_file):
     :return:
     """
     try:
-        names = ("date", "bias", "std")
-        formats = ("object", "f4", "f4")
+        names = ("date", "bias", "bias_std", "md", "md_std")
+        formats = ("object", "f4", "f4", "f4", "f4")
         data = np.loadtxt(md_file,
                           converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
                           dtype={"names": names,
                                  "formats": formats},
                           skiprows=1, ndmin=1)
     except IndexError:
-        names = ("date", "bias",)
-        formats = ("object", "f4")
+        names = ("date", "bias", "md")
+        formats = ("object", "f4", "f4")
         data = np.loadtxt(md_file,
                           converters={0: lambda x: datetime.strptime(x, "%Y%m%d")},
                           dtype={"names": names,
                                  "formats": formats},
                           skiprows=1, ndmin=1)
-
     return data
 
 

@@ -1,23 +1,34 @@
 # coding: utf-8
-'''
+"""
 Created on 2016年1月6日
 读取匹配后的 HDF5 文件，画蝴蝶图
 
 @author: zhangtao anning
-'''
+"""
 import os
 import sys
+import calendar
+from datetime import datetime
+from multiprocessing import Pool, Lock
+
+import numpy as np
+from matplotlib.ticker import MultipleLocator
+
 from configobj import ConfigObj
 from dateutil.relativedelta import relativedelta
-import numpy as np
-from mpl_toolkits.basemap import Basemap
+from numpy.lib.polynomial import polyfit
+from numpy.ma.core import std, mean
+from numpy.ma.extras import corrcoef
+
+from DV import dv_pub_3d_dev
+from DV.dv_pub_3d_dev import plt, mpl, mdates, Basemap
+from DV.dv_pub_3d_dev import bias_information, day_data_write, get_bias_data, get_cabr_data, set_tick_font
+from DV.dv_pub_3d_dev import FONT0, FONT_MONO, FONT1
+from DM.SNO.dm_sno_cross_calc_map import *
+from PB.CSC.pb_csc_console import LogServer
 from PB import pb_time, pb_io
 from PB.pb_time import is_day_timestamp_and_lon
-from PB.CSC.pb_csc_console import LogServer
-from DM.SNO.dm_sno_cross_calc_map import *
-from DM.SNO.dm_sno_cross_calc_core import Sat_Orbit
-from multiprocessing import Pool, Lock
-from datetime import datetime
+
 from plt_io import ReadHDF5, loadYamlCfg
 
 
@@ -26,21 +37,25 @@ def run(pair, ymd):
     pair: sat1+sensor1_sat2+sensor2
     ymd: YYYYMMDD
     """
-    part1, part2 = pair.split('_')
-    sat1, sensor1 = part1.split('+')
-    sat2, sensor2 = part2.split('+')
+    # 提取参数中的卫星信息和传感器信息
+    part1, part2 = pair.split("_")
+    sat1, sensor1 = part1.split("+")
+    sat2, sensor2 = part2.split("+")
 
-    if 'FY2' in part1 or 'FY4' in part1:
+    # 判断是静止卫星还是动态卫星
+    if "FY2" in part1 or "FY4" in part1:
         Type = "GEOLEO"
-    elif 'FY3' in part1:
+    elif "FY3" in part1:
         Type = "LEOLEO"
     else:
+        Log.error("Cant distinguish the satellite type")
         return
-    print('1')
-    # load yaml config file
-    plt_cfg_file = os.path.join(MainPath, '%s_%s_3d.yaml' % (sensor1, sensor2))
+
+    # 加载绘图配置文件
+    plt_cfg_file = os.path.join(MainPath, "%s_%s_3d.yaml" % (sensor1, sensor2))
     plt_cfg = loadYamlCfg(plt_cfg_file)
     if plt_cfg is None:
+        Log.error("Not find the config file: {}".format(plt_cfg_file))
         return
 
     # 读取配置文件的信息
@@ -57,19 +72,18 @@ def run(pair, ymd):
     else:
         polar = None
 
+    # 读取范围配置
     if not area and not polar:
         return
     else:
         map_range = (polar, area)
-        print('map_range:', map_range)
 
-    Log.info(u"----- Start Drawing Matched Map-Pic,"
-             u" PAIR: {}, YMD: {}, PERIOD: {} -----".format(pair, ymd, PERIOD))
+    Log.info(u"----- Start Drawing Matched Map-Pic, PAIR: {}, YMD: {}, PERIOD: {} -----".format(pair, ymd, PERIOD))
 
     # 读取 HDF5 文件数据
     oneHDF5 = ReadHDF5()
     num_file = PERIOD
-    cur_ymd = pb_time.ymd_plus(ymd, 1)
+    cur_ymd = pb_time.ymd_plus(ymd, 1)  # 回滚天数，现在为 1
     for daydelta in xrange(PERIOD):
         cur_ymd = pb_time.ymd_plus(ymd, -daydelta)
         filename = "COLLOC+%sIR,%s+%s_%s+%s_C_BABJ_%s.hdf5" % (Type, sat1,
@@ -101,7 +115,7 @@ def run(pair, ymd):
 
     x = oneHDF5.lon1  # 经度数据
     y = oneHDF5.lat1  # 维度数据
-    print 'date:{}, x_all:{} y_all:{} '.format(ymd, len(x), len(y))
+    print 'date: {}, x_all: {} y_all: {} '.format(ymd, len(x), len(y))
 
     draw_butterfly(part1, part2, cur_ymd, ymd, x, y, o_file, map_range)
     # ------- day ----------
@@ -111,8 +125,7 @@ def run(pair, ymd):
                                                               ymd))
         x_d = x[day_index]
         y_d = y[day_index]
-#         d_d = d[day_index]
-        print 'date:{}, x_day:{} y_day:{} '.format(ymd, len(x_d), len(y_d))
+        print 'date: {}, x_day: {} y_day: {} '.format(ymd, len(x_d), len(y_d))
         draw_butterfly(part1, part2, cur_ymd, ymd, x_d, y_d, o_file, map_range)
     # ---------night ------------
     if np.where(night_index)[0].size > 0:
@@ -121,8 +134,7 @@ def run(pair, ymd):
                                                                 ymd))
         x_n = x[night_index]
         y_n = y[night_index]
-#         d_n = d[night_index]
-        print 'date:{}, x_night:{} y_night:{} '.format(ymd, len(x_n), len(y_n))
+        print 'date: {}, x_night: {} y_night: {} '.format(ymd, len(x_n), len(y_n))
         draw_butterfly(part1, part2, cur_ymd, ymd, x_n, y_n, o_file, map_range)
     Log.info(u"Success")
 
@@ -181,13 +193,7 @@ def draw_butterfly(sat1Nm, sat2Nm,
         m = drawFig_map(ax3, "area", area_range)
         plot_matchpoint(m, lons, lats, COLORS[0])
 
-
     # ---------legend-----------
-    circle1 = mpatches.Circle((58, 36), 6, color=RED, ec=EDGE_GRAY, lw=0.3)
-#     circle_lst = [circle1]
-#     for i in xrange(1):
-#         circle_lst.append(mpatches.Circle((219 + i * 7, 36), 6, color=COLORS[i], ec=EDGE_GRAY, lw=0.3))
-#     fig.patches.extend(circle_lst)
 
     # 对整张图片添加文字
     TEXT_Y = 0.05
@@ -201,30 +207,27 @@ def draw_butterfly(sat1Nm, sat2Nm,
     pb_io.make_sure_path_exists(os.path.dirname(out_fig_file))
     fig.savefig(out_fig_file, dpi=100)
     print out_fig_file
+    print '-' * 50
     plt.close()
     fig.clear()
 
 
 def drawFig_map(ax, n_s, range):
-    '''
+    """
     create new figure
-    '''
-#     m = Basemap(llcrnrlon=50., llcrnrlat=-40., urcrnrlon=150., urcrnrlat=40., \
-#         resolution='c', area_thresh=10000., projection='cyl', \
-#         lat_ts=20.)
+    """
     if n_s == "area":
-        print('area range', range)
         area_range = range
         llcrnrlat = area_range[0]
         urcrnrlat = area_range[1]
         llcrnrlon = area_range[2]
         urcrnrlon = area_range[3]
-        print('area')
+
         m = Basemap(llcrnrlat=llcrnrlat, urcrnrlat=urcrnrlat,
                     llcrnrlon=llcrnrlon, urcrnrlon=urcrnrlon,
                     resolution='c', area_thresh=10000.,
                     projection='cyl', lat_ts=20., ax=ax)
-        print('area success')
+
         m.fillcontinents(color=GRAY)
 
         # draw parallels
@@ -246,22 +249,19 @@ def drawFig_map(ax, n_s, range):
                         labels=[0, 0, 0, 0],
                         dashes=[100, .0001], color='white')
         ax.set_title("Global Map", fontproperties=FONT0)
-        print('area 1')
+
     else:
         if n_s == "north":
-            print('north range', range)
             north_range = range[0]
             north_range = int(north_range[0])
             m = Basemap(projection='npaeqd', boundinglat=north_range-1,
                         lon_0=0, resolution='c', ax=ax)
-            print('north success')
+
         elif n_s == "south":
-            print('south range', range)
             south_range = range[1]
             south_range = int(south_range[0])
             m = Basemap(projection='spaeqd', boundinglat=south_range+1,
                         lon_0=180, resolution='c', ax=ax)
-            print('south success')
 
         m.fillcontinents(color=GRAY)
 
@@ -286,7 +286,7 @@ def drawFig_map(ax, n_s, range):
 
         if n_s == "north":
             lat_labels = [(0.0, i) for i in xrange(north_range, 91, 10)]
-            for lon, lat in (lat_labels):
+            for lon, lat in lat_labels:
                 xpt, ypt = m(lon, lat)
                 ax.text(xpt - 500000, ypt - 100000, str(lat)[0:2] + u'°N',
                         fontproperties=TICKER_FONT)
@@ -294,7 +294,7 @@ def drawFig_map(ax, n_s, range):
             ax.set_title("Northern Hemisphere", fontproperties=FONT0)
         elif n_s == "south":
             lat_labels = [(0.0, i) for i in xrange(south_range, -91, -10)]
-            for lon, lat in (lat_labels):
+            for lon, lat in lat_labels:
                 xpt, ypt = m(lon, lat)
                 ax.text(xpt + 500000, ypt + 200000, str(lat)[1:3] + u'°S',
                         fontproperties=TICKER_FONT)
@@ -312,74 +312,75 @@ def plot_matchpoint(m, lons, lats, color, alpha=1):
            markeredgecolor=None, mew=0, alpha=alpha)
 
 
-# 获取程序参数接口
-args = sys.argv[1:]
-help_info = \
-    u'''
-    [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
-    [参数样例2]：处理所有卫星对
-    '''
-if '-h' in args:
-    print help_info
-    sys.exit(-1)
+if __name__ == "__main__":
+    # 获取程序参数接口
+    args = sys.argv[1:]
+    help_info = \
+        u'''
+        [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
+        [参数样例2]：处理所有卫星对
+        '''
+    if '-h' in args:
+        print help_info
+        sys.exit(-1)
 
-# 获取程序所在位置，拼接配置文件
-MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-ProjPath = os.path.dirname(MainPath)
-omPath = os.path.dirname(ProjPath)
-dvPath = os.path.join(os.path.dirname(omPath), 'DV')
-cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
+    # 获取程序所在位置，拼接配置文件
+    MainPath, MainFile = os.path.split(os.path.realpath(__file__))
+    ProjPath = os.path.dirname(MainPath)
+    omPath = os.path.dirname(ProjPath)
+    dvPath = os.path.join(os.path.dirname(omPath), 'DV')
+    cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
 
-# 配置不存在预警
-if not os.path.isfile(cfgFile):
-    print (u'配置文件不存在 %s' % cfgFile)
-    sys.exit(-1)
+    # 配置不存在预警
+    if not os.path.isfile(cfgFile):
+        print (u'配置文件不存在 %s' % cfgFile)
+        sys.exit(-1)
 
-# 载入配置文件
-inCfg = ConfigObj(cfgFile)
-ORBIT_DIR = inCfg['PATH']['IN']['ORBIT']
-MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
-DMS_DIR = inCfg['PATH']['OUT']['DMS']
-LogPath = inCfg['PATH']['OUT']['LOG']
-Log = LogServer(LogPath)
+    # 载入配置文件
+    inCfg = ConfigObj(cfgFile)
+    ORBIT_DIR = inCfg['PATH']['IN']['ORBIT']
+    MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
+    DMS_DIR = inCfg['PATH']['OUT']['DMS']
+    LogPath = inCfg['PATH']['OUT']['LOG']
+    Log = LogServer(LogPath)
 
-# 获取开机线程的个数，开启线程池。
-threadNum = inCfg['CROND']['threads']
-pool = Pool(processes=int(threadNum))
+    # 获取开机线程的个数，开启线程池。
+    threadNum = inCfg['CROND']['threads']
+    pool = Pool(processes=int(threadNum))
 
-if len(args) == 2:
-    Log.info(u'手动蝴蝶图绘制程序开始运行-----------------------------')
-    satPair = args[0]
-    str_time = args[1]
-    date_s, date_e = pb_time.arg_str2date(str_time)
-    # 定义参数List，传参给线程池
-    args_List = []
+    if len(args) == 2:
+        Log.info(u'手动蝴蝶图绘制程序开始运行-----------------------------')
+        satPair = args[0]
+        str_time = args[1]
+        date_s, date_e = pb_time.arg_str2date(str_time)
+        # 定义参数List，传参给线程池
+        args_List = []
 
-    while date_s <= date_e:
-        ymd = date_s.strftime('%Y%m%d')
-        pool.apply_async(run, (satPair, ymd))
-        date_s = date_s + relativedelta(days=1)
+        while date_s <= date_e:
+            ymd_day = date_s.strftime('%Y%m%d')
+            # run(satPair, ymd_day)
+            pool.apply_async(run, (satPair, ymd_day))
+            date_s = date_s + relativedelta(days=1)
 
-    pool.close()
-    pool.join()
+        pool.close()
+        pool.join()
 
+    elif len(args) == 0:
+        Log.info(u'自动蝴蝶图绘制程序开始运行 -----------------------------')
+        rolldays = inCfg['CROND']['rolldays']
+        pairLst = inCfg['PAIRS'].keys()
+        # 定义参数List，传参给线程池
+        args_List = []
+        for satPair in pairLst:
+            ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
+            if ProjMode1 == 0:
+                continue
+            for rdays in rolldays:
+                ymd_day = (datetime.utcnow() - relativedelta(days=int(rdays))).strftime('%Y%m%d')
+                pool.apply_async(run, (satPair, ymd_day))
 
-elif len(args) == 0:
-    Log.info(u'自动蝴蝶图绘制程序开始运行 -----------------------------')
-    rolldays = inCfg['CROND']['rolldays']
-    pairLst = inCfg['PAIRS'].keys()
-    # 定义参数List，传参给线程池
-    args_List = []
-    for satPair in pairLst:
-        ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
-        if ProjMode1 == 0:
-            continue
-        for rdays in rolldays:
-            ymd = (datetime.utcnow() - relativedelta(days=int(rdays))).strftime('%Y%m%d')
-            pool.apply_async(run, (satPair, ymd))
-
-    pool.close()
-    pool.join()
-else:
-    print 'args error'
-    sys.exit(-1)
+        pool.close()
+        pool.join()
+    else:
+        print 'args error'
+        sys.exit(-1)
