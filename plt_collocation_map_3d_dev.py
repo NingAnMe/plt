@@ -125,7 +125,6 @@ def run(pair, ymd):
                                                               ymd))
         x_d = x[day_index]
         y_d = y[day_index]
-#         d_d = d[day_index]
         print 'date: {}, x_day: {} y_day: {} '.format(ymd, len(x_d), len(y_d))
         draw_butterfly(part1, part2, cur_ymd, ymd, x_d, y_d, o_file, map_range)
     # ---------night ------------
@@ -135,7 +134,6 @@ def run(pair, ymd):
                                                                 ymd))
         x_n = x[night_index]
         y_n = y[night_index]
-#         d_n = d[night_index]
         print 'date: {}, x_night: {} y_night: {} '.format(ymd, len(x_n), len(y_n))
         draw_butterfly(part1, part2, cur_ymd, ymd, x_n, y_n, o_file, map_range)
     Log.info(u"Success")
@@ -360,6 +358,7 @@ if __name__ == "__main__":
 
         while date_s <= date_e:
             ymd_day = date_s.strftime('%Y%m%d')
+            # run(satPair, ymd_day)
             pool.apply_async(run, (satPair, ymd_day))
             date_s = date_s + relativedelta(days=1)
 
