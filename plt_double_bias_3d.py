@@ -11,6 +11,7 @@ import netCDF4
 import numpy as np
 from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
+from PB.pb_time import is_day_timestamp_and_lon
 from datetime import datetime
 from DV.dv_pub_legacy import plt, mdates, set_tick_font, FONT0
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches

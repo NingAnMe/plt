@@ -23,27 +23,30 @@ from DV import dv_pub_3d
 from DV.dv_pub_3d import FONT0, bias_information, day_data_write, plt, get_bias_data, get_cabr_data
 from DM.SNO.dm_sno_cross_calc_map import BLUE
 from PB.CSC.pb_csc_console import LogServer
-from PB.pb_time import get_local_time
+from PB.pb_time import is_day_timestamp_and_lon
 from PB import pb_time, pb_io
 from plt_io import ReadHDF5, loadYamlCfg
 
 lock = Lock()
 
 
-def run(pair, ymd, isMonthly):
+def run(pair, ymd, is_monthly):
     """
     pair: sat1+sensor1_sat2+sensor2
     ymd: str YYYYMMDD
     """
+    # 提取参数中的卫星信息和传感器信息
     part1, part2 = pair.split('_')
     sat1, sensor1 = part1.split('+')
     sat2, sensor2 = part2.split('+')
 
+    # 判断是静止卫星还是动态卫星
     if 'FY2' in part1 or 'FY4' in part1:
         Type = "GEOLEO"
     elif 'FY3' in part1:
         Type = "LEOLEO"
     else:
+        Log.error('Cant distinguish the satellite type')
         return
 
     # load yaml config file
@@ -52,9 +55,7 @@ def run(pair, ymd, isMonthly):
     if plt_cfg is None:
         return
 
-    Log.info(
-        u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(
-            pair, ymd))
+    Log.info(u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(pair, ymd))
 
     for each in plt_cfg['regression']:
         dict_cabr = {}
@@ -65,7 +66,7 @@ def run(pair, ymd, isMonthly):
         dict_md_n = {}
 
         # 需要回滚的天数
-        if isMonthly:
+        if is_monthly:
             PERIOD = calendar.monthrange(int(ymd[:4]), int(ymd[4:6]))[1]  # 当月天数
             ymd = ymd[:6] + '%02d' % PERIOD  # 当月最后一天
         else:
@@ -85,23 +86,21 @@ def run(pair, ymd, isMonthly):
             num_file = PERIOD
             for daydelta in xrange(PERIOD):
                 cur_ymd = pb_time.ymd_plus(ymd, -daydelta)
-                hdf5_name = 'COLLOC+%sIR,%s_C_BABJ_%s.hdf5' % (
-                    Type, pair, cur_ymd)
+                hdf5_name = 'COLLOC+%sIR,%s_C_BABJ_%s.hdf5' % (Type, pair, cur_ymd)
                 filefullpath = os.path.join(MATCH_DIR, pair, hdf5_name)
                 if not os.path.isfile(filefullpath):
                     Log.info(u"File not found: {}".format(filefullpath))
                     num_file -= 1
                     continue
                 if not oneHDF5.LoadData(filefullpath, chan):
-                    Log.error('Error occur when reading %s of %s' % (
-                        chan, filefullpath))
+                    Log.error('Error occur when reading %s of %s' % (chan, filefullpath))
             if num_file == 0:
                 Log.error(u"No file found.")
                 continue
             elif num_file != PERIOD:
                 Log.error(u"{} of {} file(s) found.".format(num_file, PERIOD))
 
-            if isMonthly:
+            if is_monthly:
                 str_time = ymd[:6]
                 cur_path = os.path.join(MRA_DIR, pair, str_time)
             else:
@@ -109,8 +108,7 @@ def run(pair, ymd, isMonthly):
                 cur_path = os.path.join(DRA_DIR, pair, str_time)
 
             # delete 0 in std
-            if len(
-                    oneHDF5.rad1_std) > 0.0001:  # TODO: 有些极小的std可能是异常值，而导致权重极大，所以 std>0 改成 std>0.0001
+            if len(oneHDF5.rad1_std) > 0.0001:  # TODO: 有些极小的std可能是异常值，而导致权重极大，所以 std>0 改成 std>0.0001
                 deletezeros = np.where(oneHDF5.rad1_std > 0.0001)
                 oneHDF5.rad1_std = oneHDF5.rad1_std[deletezeros]
                 oneHDF5.rad1 = oneHDF5.rad1[deletezeros] if len(
@@ -123,6 +121,10 @@ def run(pair, ymd, isMonthly):
                     oneHDF5.tbb2) > 0 else oneHDF5.tbb2
                 oneHDF5.time = oneHDF5.time[deletezeros] if len(
                     oneHDF5.time) > 0 else oneHDF5.time
+                oneHDF5.lon1 = oneHDF5.lon1[deletezeros] if len(
+                    oneHDF5.lon1) > 0 else oneHDF5.lon1
+                oneHDF5.lon2 = oneHDF5.lon2[deletezeros] if len(
+                    oneHDF5.lon2) > 0 else oneHDF5.lon2
             if len(oneHDF5.ref1_std) > 0.0001:
                 deletezeros = np.where(oneHDF5.ref1_std > 0.0001)
                 oneHDF5.ref1_std = oneHDF5.ref1_std[deletezeros]
@@ -132,15 +134,19 @@ def run(pair, ymd, isMonthly):
                     oneHDF5.ref2) > 0 else oneHDF5.ref2
                 oneHDF5.dn1 = oneHDF5.dn1[deletezeros] if len(
                     oneHDF5.dn1) > 0 else oneHDF5.dn1
+                oneHDF5.dn2 = oneHDF5.dn1[deletezeros] if len(
+                    oneHDF5.dn2) > 0 else oneHDF5.dn2
                 oneHDF5.time = oneHDF5.time[deletezeros] if len(
                     oneHDF5.time) > 0 else oneHDF5.time
+                oneHDF5.lon1 = oneHDF5.lon1[deletezeros] if len(
+                    oneHDF5.lon1) > 0 else oneHDF5.lon1
+                oneHDF5.lon2 = oneHDF5.lon2[deletezeros] if len(
+                    oneHDF5.lon2) > 0 else oneHDF5.lon2
 
             # find out day and night
-            if ('day' in Day_Night or 'night' in Day_Night) and len(
-                    oneHDF5.time) > 0:
-                jd = oneHDF5.time / 24. / 3600.  # jday from 1993/01/01 00:00:00
-                hour = ((jd - jd.astype('int8')) * 24).astype('int8')
-                day_index = (hour < 10)  # utc hour<10 is day
+            if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
+                vect_is_day = np.vectorize(is_day_timestamp_and_lon)
+                day_index = vect_is_day(oneHDF5.time, oneHDF5.lon1)
                 night_index = np.logical_not(day_index)
             else:
                 day_index = None
@@ -213,8 +219,9 @@ def run(pair, ymd, isMonthly):
                 dict_cabr_n[o_name] = {}
                 dict_md_n[xname] = {}
 
-            if x.size < 10:
-                Log.error("Not enough match point to draw.")
+            # 对样本点数量进行判断，如果样本点少于 100 个，则不进行绘制
+            if x.size < 100:
+                Log.error("Not enough match point to draw: {}, {}".format(each, chan))
                 if 'all' in Day_Night:
                     dict_cabr[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_md[xname][chan] = np.NaN
@@ -236,7 +243,7 @@ def run(pair, ymd, isMonthly):
                                  num_file, part1, part2, chan, str_time,
                                  xname, xname_l, xunit, xmin, xmax,
                                  yname, yname_l, yunit, ymin, ymax,
-                                 diagonal, isMonthly)
+                                 diagonal, is_monthly)
                 if abr:
                     dict_cabr[o_name][chan] = abr
                 else:
@@ -255,13 +262,13 @@ def run(pair, ymd, isMonthly):
                     x_d = x[day_index]
                     y_d = y[day_index]
                     w_d = weight[day_index] if weight is not None else None
-                    print('x, y', len(x), len(y))
+                    print('x_all, y_all', len(x), len(y))
                     print('x_day, y_day', len(x_d), len(y_d))
                     abr, bias = plot(x_d, y_d, w_d, o_file,
                                      num_file, part1, part2, chan, str_time,
                                      xname, xname_l, xunit, xmin, xmax,
                                      yname, yname_l, yunit, ymin, ymax,
-                                     diagonal, isMonthly)
+                                     diagonal, is_monthly)
                     if abr:
                         dict_cabr_d[o_name][chan] = abr
                     else:
@@ -281,13 +288,13 @@ def run(pair, ymd, isMonthly):
                     x_n = x[night_index]
                     y_n = y[night_index]
                     w_n = weight[night_index] if weight is not None else None
-                    print('x, y', len(x), len(y))
+                    print('x_all, y_all', len(x), len(y))
                     print('x_night, y_night', len(x_n), len(y_n))
                     abr, bias = plot(x_n, y_n, w_n, o_file,
                                      num_file, part1, part2, chan, str_time,
                                      xname, xname_l, xunit, xmin, xmax,
                                      yname, yname_l, yunit, ymin, ymax,
-                                     diagonal, isMonthly)
+                                     diagonal, is_monthly)
                     if abr:
                         dict_cabr_n[o_name][chan] = abr
                     else:
@@ -306,24 +313,18 @@ def run(pair, ymd, isMonthly):
         channel = plt_cfg[each]['chan']
         if 'all' in Day_Night:
             for o_name in dict_cabr:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr,
-                         'ALL', isMonthly)
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_md, 'ALL')
                 write_cabr(channel, part1, part2, o_name, ymd,
                            dict_cabr, 'ALL')
         if 'day' in Day_Night:
             for o_name in dict_cabr_d:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_d,
-                         'Day', isMonthly)
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_md_d, 'Day')
                 write_cabr(channel, part1, part2, o_name, ymd,
                            dict_cabr_d, 'Day')
         if 'night' in Day_Night:
             for o_name in dict_cabr_n:
-                writeTxt(channel, part1, part2, o_name, str_time, dict_cabr_n,
-                         'Night', isMonthly)
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_md_n, 'Night')
                 write_cabr(channel, part1, part2, o_name, ymd,
@@ -537,85 +538,9 @@ def month_average(day_date, day_data):
     return month_datas
 
 
-def writeTxt(channel, part1, part2, o_name, ymd,
-             dict_cabr, DayOrNight, isMonthly):
-    """
-    生成abr文件
-    ymd: YYYYMMDD or YYYYMM
-    """
-    if len(ymd) == 6:
-        ymd = ymd + '01'
-    if isMonthly:
-        FileName = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
-                                '%s_%s_%s_%s_Monthly.txt' % (
-                                    part1, part2, o_name, DayOrNight))
-    else:
-        FileName = os.path.join(ABR_DIR, '%s_%s' % (part1, part2),
-                                '%s_%s_%s_%s_%s.txt' % (
-                                    part1, part2, o_name, DayOrNight, ymd[:4]))
-
-    title_line = 'YMD       '
-    newline = ''
-    for chan in channel:
-        title_line = title_line + '  Count(%s) Slope(%s) Intercept(%s) RSquared(%s)' % (
-            chan, chan, chan, chan)
-        newline = newline + '  %10d  %-10.6f  %-10.6f  %-10.6f' % (
-            tuple(dict_cabr[o_name][chan]))
-    newline = newline + '\n'  # don't forget to end with \n
-
-    allLines = []
-    titleLines = []
-    DICT_TXT = {}
-
-    pb_io.make_sure_path_exists(os.path.dirname(FileName))
-
-    # 写十行头信息
-    titleLines.append('Sat1: %s\n' % part1)
-    titleLines.append('Sat2: %s\n' % part2)
-    if isMonthly:
-        titleLines.append('TimeRange: since launch\n')
-        titleLines.append('           Monthly\n')
-    else:
-        titleLines.append('TimeRange: %s\n' % ymd[:4])
-        titleLines.append('           Daily\n')
-    titleLines.append('Day or Night: %s\n' % DayOrNight)
-    titleLines.append(
-        'Calc time : %s\n' % get_local_time().strftime('%Y.%m.%d %H:%M:%S'))
-    titleLines.append('\n')
-    titleLines.append('\n')
-    titleLines.append(title_line + '\n')
-    titleLines.append('-' * len(title_line) + '\n')
-
-    #
-    if os.path.isfile(FileName) and os.path.getsize(FileName) != 0:
-        fp = open(FileName, 'r')
-        for i in xrange(10):
-            fp.readline()  # 跳过头十行
-        Lines = fp.readlines()
-        fp.close()
-        # 使用字典特性，保证时间唯一，读取数据
-        for Line in Lines:
-            DICT_TXT[Line[:8]] = Line[8:]
-        # 添加或更改数据
-        DICT_TXT[ymd] = newline
-        # 按照时间排序
-        newLines = sorted(DICT_TXT.iteritems(), key=lambda d: d[0],
-                          reverse=False)
-
-        for i in xrange(len(newLines)):
-            allLines.append(str(newLines[i][0]) + str(newLines[i][1]))
-    else:
-        allLines.append(ymd + newline)
-
-    fp = open(FileName, 'w')
-    fp.writelines(titleLines)
-    fp.writelines(allLines)
-    fp.close()
-
-
 def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
          xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax,
-         is_diagonal, isMonthly):
+         is_diagonal, is_monthly):
     plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
 
     # 过滤 正负 delta+8 倍 std 的杂点 ------------------------
@@ -637,7 +562,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     length_rad = len(x)
 
     bias = None  # 当 bias 没有被计算的时候，不输出 bias
-    if not isMonthly and is_diagonal:
+    if not is_monthly and is_diagonal:
         # return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]
         fig = plt.figure(figsize=(14, 4.5))
         fig.subplots_adjust(top=0.92, bottom=0.11, left=0.045, right=0.985)
@@ -823,7 +748,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             axislimit=histogram_axislimit, histogram=histogram_y,
         )
 
-    elif not isMonthly and not is_diagonal:
+    elif not is_monthly and not is_diagonal:
         fig = plt.figure(figsize=(4.5, 4.5))
         fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
         ax1 = plt.subplot2grid((1, 1), (0, 0))
@@ -886,7 +811,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             diagonal=regress_diagonal, regressline=regress_regressline,
             scatter_point=scatter_point,
         )
-    elif isMonthly:
+    elif is_monthly:
         o_file = o_file + "_density"
 
         fig = plt.figure(figsize=(4.5, 4.5))
@@ -1021,6 +946,7 @@ if __name__ == "__main__":
 
     # 开启进程池
     threadNum = inCfg['CROND']['threads']
+    # threadNum = '10'
     pool = Pool(processes=int(threadNum))
 
     if len(args) == 2:
@@ -1041,9 +967,9 @@ if __name__ == "__main__":
         args_List = []
 
         while date_s <= date_e:
-            ymd = date_s.strftime('%Y%m%d')
-            # run(satPair, ymd, isMonthly)
-            pool.apply_async(run, (satPair, ymd, isMonthly))
+            ymd_day = date_s.strftime('%Y%m%d')
+            # run(satPair, ymd_day, isMonthly)
+            pool.apply_async(run, (satPair, ymd_day, isMonthly))
             date_s = date_s + timeStep
 
         pool.close()
@@ -1060,17 +986,17 @@ if __name__ == "__main__":
                 continue
             for rdays in rolldays:
                 isMonthly = False
-                ymd = (datetime.utcnow() - relativedelta(
+                ymd_day = (datetime.utcnow() - relativedelta(
                     days=int(rdays))).strftime('%Y%m%d')
-                pool.apply_async(run, (satPair, ymd, isMonthly))
+                pool.apply_async(run, (satPair, ymd_day, isMonthly))
             # 增加一个月的作业,默认当前月和上一个月
             isMonthly = True
-            ymd = (datetime.utcnow() - relativedelta(
+            ymd_month = (datetime.utcnow() - relativedelta(
                 days=int(rolldays[0]))).strftime('%Y%m%d')
-            ymdLast = (datetime.utcnow() - relativedelta(months=1)).strftime(
+            ymd_last_month = (datetime.utcnow() - relativedelta(months=1)).strftime(
                 '%Y%m%d')
-            pool.apply_async(run, (satPair, ymd, isMonthly))
-            pool.apply_async(run, (satPair, ymdLast, isMonthly))
+            pool.apply_async(run, (satPair, ymd_month, isMonthly))
+            pool.apply_async(run, (satPair, ymd_last_month, isMonthly))
 
         pool.close()
         pool.join()

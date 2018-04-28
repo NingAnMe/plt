@@ -19,9 +19,10 @@ from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
-from DV.dv_pub_3d import plt, add_annotate, set_tick_font, FONT0, FONT_MONO,\
+from DV.dv_pub_3d_dev import plt, add_annotate, set_tick_font, FONT0, FONT_MONO,\
     draw_distribution, draw_bar, draw_histogram, bias_information, FONT1
 from PB import pb_time, pb_io
+from PB.pb_time import is_day_timestamp_and_lon
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME
 from PB.CSC.pb_csc_console import LogServer
 from plt_io import ReadHDF5, loadYamlCfg
@@ -92,9 +93,8 @@ def run(pair, ymd):
 
             # find out day and night
             if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
-                jd = oneHDF5.time / 24. / 3600.  # jday from 1993/01/01 00:00:00
-                hour = ((jd - jd.astype('int8')) * 24).astype('int8')
-                day_index = (hour < 10)  # utc hour<10 is day
+                vect_is_day = np.vectorize(is_day_timestamp_and_lon)
+                day_index = vect_is_day(oneHDF5.time, oneHDF5.lon1)
                 night_index = np.logical_not(day_index)
             else:
                 day_index = None

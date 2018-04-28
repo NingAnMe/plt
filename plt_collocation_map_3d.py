@@ -12,6 +12,7 @@ from dateutil.relativedelta import relativedelta
 import numpy as np
 from mpl_toolkits.basemap import Basemap
 from PB import pb_time, pb_io
+from PB.pb_time import is_day_timestamp_and_lon
 from PB.CSC.pb_csc_console import LogServer
 from DM.SNO.dm_sno_cross_calc_map import *
 from DM.SNO.dm_sno_cross_calc_core import Sat_Orbit
@@ -94,9 +95,8 @@ def run(pair, ymd):
                           '%s_%s_MatchedPoints_ALL_%s' % (part1, part2, ymd))
 
     # find out day and night
-    jd = oneHDF5.time / 24. / 3600.  # jday from 1993/01/01 00:00:00
-    hour = ((jd - jd.astype('int8')) * 24).astype('int8')
-    day_index = (hour < 10)  # utc hour<10 is day
+    vect_is_day = np.vectorize(is_day_timestamp_and_lon)
+    day_index = vect_is_day(oneHDF5.time, oneHDF5.lon1)
     night_index = np.logical_not(day_index)
 
     x = oneHDF5.lon1  # 经度数据
