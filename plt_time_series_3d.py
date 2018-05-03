@@ -21,13 +21,15 @@ from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
+from PB.CSC.pb_csc_console import LogServer
+from PB import pb_time, pb_io
+
 from DV import dv_pub_3d
 from DV.dv_pub_3d import plt, mpl, mdates, Basemap
 from DV.dv_pub_3d import bias_information, day_data_write, get_bias_data, get_cabr_data, set_tick_font
 from DV.dv_pub_3d import FONT0, FONT_MONO, FONT1
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
-from PB.CSC.pb_csc_console import LogServer
-from PB import pb_time, pb_io
+
 from PB.pb_time import is_day_timestamp_and_lon
 
 from plt_io import ReadHDF5, loadYamlCfg
@@ -557,8 +559,16 @@ def plot_md(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
     # 设置 title 参数
     part1, part2 = pair.split('_')
 
-    title = 'Time Series of {} Mean Bias \n{} Minus {} {} {}'.format(
-                            xname.upper(), part1, part2, chan, day_or_night)
+    if xname == "ref":
+        greater_range = 15
+        title = 'Time Series of REF Relative Bias \n{} Minus {} {} {} REF=Mean({}%~100%Range)'.format(
+            part1, part2, chan, day_or_night, greater_range)
+    elif xname == "tbb":
+        title = 'Time Series of {} Mean Bias \n{} Minus {} {} {}'.format(
+            xname.upper(), part1, part2, chan, day_or_night)
+    else:
+        title = 'Time Series of {} Mean Bias \n{} Minus {} {} {}'.format(
+            xname.upper(), part1, part2, chan, day_or_night)
 
     # plot timeseries --------------------------------------------------------
     timeseries_xmin = pb_time.ymd2date(
@@ -569,8 +579,11 @@ def plot_md(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
         timeseries_ymin = -4.0
         timeseries_ymax = 4.0
     elif "FY3" in part1 and xname == "ref":
-        timeseries_ymin = -0.2
-        timeseries_ymax = 0.2
+        timeseries_ymin = -20
+        timeseries_ymax = 20
+    else:
+        timeseries_ymin = None
+        timeseries_ymax = None
 
     timeseries_axislimit = {
         "xlimit": (timeseries_xmin, timeseries_xmax),
@@ -579,10 +592,18 @@ def plot_md(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
 
     # x y 轴标签
     timeseries_label = {}
-    if xunit != "":
-        ylabel = 'Mean Bias {}'.format(xunit)
+    if xname == "ref":
+        if xunit != "":
+            ylabel = 'Relative Bias {}'.format(xunit)
+        else:
+            ylabel = "Relative Bias %"
+    elif xname == "tbb":
+        if xunit != "":
+            ylabel = 'DTB({})'.format(xunit)
+        else:
+            ylabel = "DTB"
     else:
-        ylabel = "Mean Bias"
+        ylabel = None
     timeseries_label["ylabel"] = ylabel
 
     # x, y 轴大刻度的数量，和小刻度的数量

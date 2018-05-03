@@ -693,8 +693,19 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         bias_and_md.append(bias)
 
         # Range Mean : 偏差图的 MD 信息
-        md_greater = bias_info.get("md_greater", np.NaN)
-        bias_and_md.append(md_greater)
+        if xname == "tbb":
+            md_greater = bias_info.get("md_greater", np.NaN)
+            md = md_greater
+        elif xname == "ref":
+            md_greater = bias_info.get("md_greater")
+            mt_greater = bias_info.get("mt_greater")
+            if md_greater is not None and mt_greater is not None:
+                md = (md_greater / mt_greater) * 100
+            else:
+                md = np.NaN
+        else:
+            md = np.NaN
+        bias_and_md.append(md)
 
         # 添加注释信息
         distri_annotate = {"left": [], "right": []}
