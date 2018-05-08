@@ -98,14 +98,6 @@ def run(pair, ymd):
             # 输出目录
             cur_path = os.path.join(MBA_DIR, pair, ymd[:6])
 
-            # find out day and night
-            if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
-                vect_is_day = np.vectorize(is_day_timestamp_and_lon)
-                day_index = vect_is_day(oneHDF5.time, oneHDF5.lon1)
-                night_index = np.logical_not(day_index)
-            else:
-                day_index = None
-                night_index = None
             # get threhold, unit, names...
             xname, yname = each.split('-')
             bias = xname
@@ -115,6 +107,77 @@ def run(pair, ymd):
             xmin, xmax = xlimit.split('-')
             xmin = float(xmin)
             xmax = float(xmax)
+            # get x
+            dset_name = xname + "1"
+            if hasattr(oneHDF5, dset_name):
+                x = getattr(oneHDF5, dset_name)
+            else:
+                Log.error("Can't plot, no %s in HDF5 class" % dset_name)
+                continue
+            # get y
+            dset_name = yname + "2"
+            if hasattr(oneHDF5, dset_name):
+                y = getattr(oneHDF5, dset_name)
+            else:
+                Log.error("Can't plot, no %s in HDF5 class" % dset_name)
+                continue
+            if 'rad' == bias:
+                o_name = 'RadBiasMonthStats'
+            elif 'tbb' == bias:
+                o_name = 'TBBiasMonthStats'
+            elif 'ref' == bias:
+                o_name = 'RefBiasMonthStats'
+            else:
+                o_name = 'DUMMY'
+            if x.size < 10:
+                Log.error("Not enough match point to draw.")
+                continue
+
+            # delete 0 in std
+            if len(oneHDF5.rad1_std) > 0.0001:  # TODO: 有些极小的std可能是异常值，而导致权重极大，所以 std>0 改成 std>0.0001
+                deletezeros = np.where(oneHDF5.rad1_std > 0.0001)
+                oneHDF5.rad1_std = oneHDF5.rad1_std[deletezeros]
+                oneHDF5.rad1 = oneHDF5.rad1[deletezeros] if len(
+                    oneHDF5.rad1) > 0 else oneHDF5.rad1
+                oneHDF5.rad2 = oneHDF5.rad2[deletezeros] if len(
+                    oneHDF5.rad2) > 0 else oneHDF5.rad2
+                oneHDF5.tbb1 = oneHDF5.tbb1[deletezeros] if len(
+                    oneHDF5.tbb1) > 0 else oneHDF5.tbb1
+                oneHDF5.tbb2 = oneHDF5.tbb2[deletezeros] if len(
+                    oneHDF5.tbb2) > 0 else oneHDF5.tbb2
+                oneHDF5.time = oneHDF5.time[deletezeros] if len(
+                    oneHDF5.time) > 0 else oneHDF5.time
+                oneHDF5.lon1 = oneHDF5.lon1[deletezeros] if len(
+                    oneHDF5.lon1) > 0 else oneHDF5.lon1
+                oneHDF5.lon2 = oneHDF5.lon2[deletezeros] if len(
+                    oneHDF5.lon2) > 0 else oneHDF5.lon2
+            if len(oneHDF5.ref1_std) > 0.0001:
+                deletezeros = np.where(oneHDF5.ref1_std > 0.0001)
+                oneHDF5.ref1_std = oneHDF5.ref1_std[deletezeros]
+                oneHDF5.ref1 = oneHDF5.ref1[deletezeros] if len(
+                    oneHDF5.ref1) > 0 else oneHDF5.ref1
+                oneHDF5.ref2 = oneHDF5.ref2[deletezeros] if len(
+                    oneHDF5.ref2) > 0 else oneHDF5.ref2
+                oneHDF5.dn1 = oneHDF5.dn1[deletezeros] if len(
+                    oneHDF5.dn1) > 0 else oneHDF5.dn1
+                oneHDF5.dn2 = oneHDF5.dn1[deletezeros] if len(
+                    oneHDF5.dn2) > 0 else oneHDF5.dn2
+                oneHDF5.time = oneHDF5.time[deletezeros] if len(
+                    oneHDF5.time) > 0 else oneHDF5.time
+                oneHDF5.lon1 = oneHDF5.lon1[deletezeros] if len(
+                    oneHDF5.lon1) > 0 else oneHDF5.lon1
+                oneHDF5.lon2 = oneHDF5.lon2[deletezeros] if len(
+                    oneHDF5.lon2) > 0 else oneHDF5.lon2
+
+            # find out day and night
+            if ('day' in Day_Night or 'night' in Day_Night) and len(oneHDF5.time) > 0:
+                vect_is_day = np.vectorize(is_day_timestamp_and_lon)
+                day_index = vect_is_day(oneHDF5.time, oneHDF5.lon1)
+                night_index = np.logical_not(day_index)
+            else:
+                day_index = None
+                night_index = None
+
             # get x
             dset_name = xname + "1"
             if hasattr(oneHDF5, dset_name):
@@ -161,6 +224,7 @@ def run(pair, ymd):
             if 'all' in Day_Night:
                 o_file = os.path.join(cur_path,
                                       '%s_%s_%s_ALL_%s' % (pair, o_name, chan, ym))
+                print("x_all, y_all", len(x), len(y))
                 plot(x, y, weight, o_file,
                      part1, part2, chan, ym, 'ALL', reference_list,
                      xname, xname_l, xunit, xmin, xmax)
@@ -174,6 +238,8 @@ def run(pair, ymd):
                     x_d = x[day_index]
                     y_d = y[day_index]
                     w_d = weight[day_index] if weight is not None else None
+                    print("x_all, y_all", len(x), len(y))
+                    print("x_day, y_day", len(x_d), len(y_d))
                     plot(x_d, y_d, w_d, o_file,
                          part1, part2, chan, ym, 'Day', reference_list,
                          xname, xname_l, xunit, xmin, xmax)
@@ -186,6 +252,8 @@ def run(pair, ymd):
                     x_n = x[night_index]
                     y_n = y[night_index]
                     w_n = weight[day_index] if weight is not None else None
+                    print("x_all, y_all", len(x), len(y))
+                    print("x_night, y_night", len(x_n), len(y_n))
                     plot(x_n, y_n, w_n, o_file,
                          part1, part2, chan, ym, 'Night', reference_list,
                          xname, xname_l, xunit, xmin, xmax)
@@ -205,6 +273,7 @@ def plot(x, y, weight, picPath,
     # 过滤 正负 delta+8倍std 的杂点 ------------
     w = 1.0 / weight if weight is not None else None
     RadCompare = G_reg1d(x, y, w)
+
     reg_line = x * RadCompare[0] + RadCompare[1]
     delta = np.abs(y - reg_line)
     mean_delta = np.mean(delta)
@@ -392,6 +461,7 @@ def plot(x, y, weight, picPath,
 
     pb_io.make_sure_path_exists(os.path.dirname(picPath))
     fig.savefig(picPath)
+    print picPath
     plt.close()
     fig.clear()
 
