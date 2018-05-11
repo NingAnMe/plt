@@ -583,7 +583,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     if not is_monthly and is_diagonal:
         # return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]
         fig = plt.figure(figsize=(14, 4.5))
-        # fig.subplots_adjust(top=0.92, bottom=0.11, left=0.045, right=0.985)
+        # fig.subplots_adjust(top=0.90)
         ax1 = plt.subplot2grid((1, 3), (0, 0))
         ax2 = plt.subplot2grid((1, 3), (0, 1))
         ax3 = plt.subplot2grid((1, 3), (0, 2))
@@ -764,6 +764,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
                                         )
 
         # 画直方图 --------------------------------------------------
+        print "draw histogram"
         histogram_xmin = xmin
         histogram_xmax = xmax
         histogram_axislimit = {
@@ -807,7 +808,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
     elif not is_monthly and not is_diagonal:
         fig = plt.figure(figsize=(4.5, 4.5))
-        # fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
+        # fig.subplots_adjust(bottom=0.12, top=0.86)
         ax1 = plt.subplot2grid((1, 1), (0, 0))
         # 图片 Title
         titleName = "%s-%s" % (xname.upper(), yname.upper())
@@ -875,7 +876,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         o_file = o_file + "_density"
 
         fig = plt.figure(figsize=(4.5, 4.5))
-        # fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
+        # fig.subplots_adjust(bottom=0.12, top=0.86)
         ax1 = plt.subplot2grid((1, 1), (0, 0))
         # 图片 Title Label
         titleName = "%s-%s" % (xname.upper(), yname.upper())
@@ -943,20 +944,24 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     else:
         print "::::::No output Pic {} : ".format(ymd)
         return
+
     # 自动调整子图间距
     plt.tight_layout()
 
-    if isMonthly or not is_diagonal:
-        fig.subplots_adjust(bottom=0.12, top=0.86)
-    else:
+    if not is_monthly and is_diagonal:
         fig.subplots_adjust(top=0.90)
+    elif not is_monthly and not is_diagonal:
+        fig.subplots_adjust(bottom=0.12, top=0.86)
+    elif is_monthly:
+        fig.subplots_adjust(bottom=0.12, top=0.86)
 
     FONT1.set_size(14)
     fig.suptitle(title, fontsize=14, fontproperties=FONT1)
     pb_io.make_sure_path_exists(os.path.dirname(o_file))
+
     fig.savefig(o_file, dpi=100)
     print o_file + ".png"
-    print "-" * 50
+    print "-" * 100
     fig.clear()
     plt.close()
 
