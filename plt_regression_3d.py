@@ -583,7 +583,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     if not is_monthly and is_diagonal:
         # return [len(x), RadCompare[0], RadCompare[1], RadCompare[4]]
         fig = plt.figure(figsize=(14, 4.5))
-        fig.subplots_adjust(top=0.92, bottom=0.11, left=0.045, right=0.985)
+        # fig.subplots_adjust(top=0.92, bottom=0.11, left=0.045, right=0.985)
         ax1 = plt.subplot2grid((1, 3), (0, 0))
         ax2 = plt.subplot2grid((1, 3), (0, 1))
         ax3 = plt.subplot2grid((1, 3), (0, 2))
@@ -614,7 +614,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             ylabel = "{} {}".format(part2, yname_l)
 
         regress_label = {
-            "xlabel": xlabel, "ylabel": ylabel,
+            "xlabel": xlabel, "ylabel": ylabel, "fontsize": 14,
         }
 
         if xname == "tbb":
@@ -627,11 +627,14 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             regress_locator = None
 
         regress_annotate = {
-            "left": ["{:15}: {:7.4f}".format("Slope", RadCompare[0]),
-                     "{:15}: {:7.4f}".format("Intercept", RadCompare[1]),
-                     "{:15}: {:7.4f}".format("Cor-Coef", RadCompare[4]),
-                     "{:15}: {:7d}".format("Number", length_rad)]
+            "left": ["{:10}: {:7.4f}".format("Slope", RadCompare[0]),
+                     "{:10}: {:7.4f}".format("Intercept", RadCompare[1]),
+                     "{:10}: {:7.4f}".format("Cor-Coef", RadCompare[4]),
+                     "{:10}: {:7d}".format("Number", length_rad)],
+            "fontsize": 14,
         }
+
+        regress_tick = {"fontsize": 14, }
 
         regress_diagonal = {"line_color": "#808080", "line_width": 1.2}
 
@@ -640,7 +643,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         scatter_point = {"scatter_alpha": 0.8}
 
         dv_pub_3d.draw_regression(
-            ax1, x, y, label=regress_label, ax_annotate=regress_annotate,
+            ax1, x, y, label=regress_label, ax_annotate=regress_annotate, tick=regress_tick,
             axislimit=regress_axislimit, locator=regress_locator,
             diagonal=regress_diagonal, regressline=regress_regressline,
             scatter_point=scatter_point,
@@ -667,9 +670,14 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         # x y 轴标签
         xlabel = "{}".format(xname_l)
-        ylabel = "{} minus {} {} bias".format(part1, part2, xname)
+        if xname == "tbb":
+            ylabel = "{} bias {}_{} ".format(xname.upper(), part1, part2, )
+        elif xname == "ref":
+            ylabel = "{} bias {}_{} ".format(xname.capitalize(), part1, part2, )
+        else:
+            ylabel = "{} bias {}_{} ".format(xname, part1, part2, )
         distri_label = {
-            "xlabel": xlabel, "ylabel": ylabel,
+            "xlabel": xlabel, "ylabel": ylabel, "fontsize": 14,
         }
 
         # 获取 MeanBias 信息
@@ -677,16 +685,24 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         boundary = xmin + (xmax - xmin) * 0.15
         bias_info = bias_information(x, y, boundary, bias_range)
 
+        # 格式化 MeanBias 信息
+        info_lower = "MeanBias(<={:d}%Range)=\n    {:.4f}±{:.4f}@{:.4f}".format(
+            int(bias_range * 100), bias_info.get("md_lower"),
+            bias_info.get("std_lower"), bias_info.get("mt_lower"))
+        info_greater = "MeanBias(>{:d}%Range)=\n    {:.4f}±{:.4f}@{:.4f}".format(
+            int(bias_range * 100), bias_info.get("md_greater"),
+            bias_info.get("std_greater"), bias_info.get("mt_greater"))
+
         # 绝对偏差和相对偏差信息 TBB=250K  REF=0.25
         ab = RadCompare
         a = ab[0]
         b = ab[1]
         if xname == "tbb":
             bias = 250 - (250 * a + b)
-            bias_info_md = "TBB Bias (250K) : {:.4f} K".format(bias)
+            bias_info_md = "TBB Bias(250K):{:.4f}K".format(bias)
         elif xname == "ref":
             bias = (0.25 - (0.25 * a + b)) / 0.25 * 100
-            bias_info_md = "Relative Bias (REF 0.25) : {:.4f} %".format(bias)
+            bias_info_md = "Relative Bias(REF0.25):{:.4f}%".format(bias)
         else:
             bias = np.NaN  # RMD or TBB bias
             bias_info_md = ""
@@ -708,10 +724,14 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         bias_and_md.append(md)
 
         # 添加注释信息
-        distri_annotate = {"left": [], "right": []}
-        distri_annotate.get("left").append(bias_info.get("info_lower"))
-        distri_annotate.get("left").append(bias_info.get("info_greater"))
+        distri_annotate = {"left": [], "leftbottom": [], "right": [], "fontsize": 14, }
+
         distri_annotate.get("left").append(bias_info_md)
+        distri_annotate.get("leftbottom").append(info_lower)
+        distri_annotate.get("leftbottom").append(info_greater)
+
+        # 添加 tick 信息
+        distri_tick = {"fontsize": 14, }
 
         # 添加间隔数量
         if xname == "tbb":
@@ -735,6 +755,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         regressline = {"line_color": "r", "line_width": 1.2}
         dv_pub_3d.draw_distribution(ax2, x, y, label=distri_label,
                                         ax_annotate=distri_annotate,
+                                        tick=distri_tick,
                                         axislimit=distri_limit,
                                         locator=distri_locator,
                                         zeroline=zeroline,
@@ -752,7 +773,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         histogram_xlabel = "{}".format(xname_l)
         histogram_ylabel = "match point numbers"
         histogram_label = {
-            "xlabel": histogram_xlabel, "ylabel": histogram_ylabel,
+            "xlabel": histogram_xlabel, "ylabel": histogram_ylabel, "fontsize": 14,
         }
 
         # 添加间隔数量
@@ -766,25 +787,27 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             histogram_locator = None
 
         histogram_x = {
-            "label": part1, "color": "red", "alpha": 0.4, "bins": 100
+            "label": part1, "color": "red", "alpha": 0.4, "bins": 100, "fontsize": 14,
         }
         histogram_y = {
-            "label": part2, "color": "blue", "alpha": 0.4, "bins": 100
+            "label": part2, "color": "blue", "alpha": 0.4, "bins": 100,"fontsize": 14,
         }
 
+        histogram_tick = {"fontsize": 14, }
+
         dv_pub_3d.draw_histogram(
-            ax3, x, label=histogram_label, locator=histogram_locator,
+            ax3, x, label=histogram_label, locator=histogram_locator, tick=histogram_tick,
             axislimit=histogram_axislimit, histogram=histogram_x,
         )
 
         dv_pub_3d.draw_histogram(
-            ax3, y, label=histogram_label, locator=histogram_locator,
+            ax3, y, label=histogram_label, locator=histogram_locator, tick=histogram_tick,
             axislimit=histogram_axislimit, histogram=histogram_y,
         )
 
     elif not is_monthly and not is_diagonal:
         fig = plt.figure(figsize=(4.5, 4.5))
-        fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
+        # fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
         ax1 = plt.subplot2grid((1, 1), (0, 0))
         # 图片 Title
         titleName = "%s-%s" % (xname.upper(), yname.upper())
@@ -812,7 +835,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             ylabel = "{} {}".format(part2, yname_l)
 
         regress_label = {
-            "xlabel": xlabel, "ylabel": ylabel,
+            "xlabel": xlabel, "ylabel": ylabel, "fontsize": 14,
         }
 
         if xname == "tbb":
@@ -827,11 +850,14 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             regress_locator = None
 
         regress_annotate = {
-            "left": ["{:15}: {:7.4f}".format("Slope", RadCompare[0]),
-                     "{:15}: {:7.4f}".format("Intercept", RadCompare[1]),
-                     "{:15}: {:7.4f}".format("Cor-Coef", RadCompare[4]),
-                     "{:15}: {:7d}".format("Number", length_rad)]
+            "left": ["{:10}: {:7.4f}".format("Slope", RadCompare[0]),
+                     "{:10}: {:7.4f}".format("Intercept", RadCompare[1]),
+                     "{:10}: {:7.4f}".format("Cor-Coef", RadCompare[4]),
+                     "{:10}: {:7d}".format("Number", length_rad)],
+            "fontsize": 14,
         }
+
+        regress_tick = {"fontsize": 14, }
 
         regress_diagonal = {"line_color": "#808080", "line_width": 1.2}
 
@@ -840,7 +866,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         scatter_point = {"scatter_alpha": 0.8}
 
         dv_pub_3d.draw_regression(
-            ax1, x, y, label=regress_label, ax_annotate=regress_annotate,
+            ax1, x, y, label=regress_label, ax_annotate=regress_annotate, tick=regress_tick,
             axislimit=regress_axislimit, locator=regress_locator,
             diagonal=regress_diagonal, regressline=regress_regressline,
             scatter_point=scatter_point,
@@ -849,7 +875,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         o_file = o_file + "_density"
 
         fig = plt.figure(figsize=(4.5, 4.5))
-        fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
+        # fig.subplots_adjust(top=0.89, bottom=0.13, left=0.15, right=0.91)
         ax1 = plt.subplot2grid((1, 1), (0, 0))
         # 图片 Title Label
         titleName = "%s-%s" % (xname.upper(), yname.upper())
@@ -877,7 +903,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             ylabel = "{} {}".format(part2, yname_l)
 
         density_label = {
-            "xlabel": xlabel, "ylabel": ylabel,
+            "xlabel": xlabel, "ylabel": ylabel, "fontsize": 14,
         }
 
         if xname == "tbb":
@@ -892,11 +918,14 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             density_locator = None
 
         density_annotate = {
-            "left": ["{:15}: {:7.4f}".format("Slope", RadCompare[0]),
-                     "{:15}: {:7.4f}".format("Intercept", RadCompare[1]),
-                     "{:15}: {:7.4f}".format("Cor-Coef", RadCompare[4]),
-                     "{:15}: {:7d}".format("Number", length_rad)]
+            "left": ["{:10}: {:7.4f}".format("Slope", RadCompare[0]),
+                     "{:10}: {:7.4f}".format("Intercept", RadCompare[1]),
+                     "{:10}: {:7.4f}".format("Cor-Coef", RadCompare[4]),
+                     "{:10}: {:7d}".format("Number", length_rad)],
+            "fontsize": 14,
         }
+
+        density_tick = {"fontsize": 14, }
 
         density_diagonal = {"line_color": "#808080", "line_width": 1.2}
 
@@ -906,7 +935,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
             "size": 5, "marker": "o", "alpha": 1
         }
         dv_pub_3d.draw_regression(
-            ax1, x, y, label=density_label, ax_annotate=density_annotate,
+            ax1, x, y, label=density_label, ax_annotate=density_annotate, tick=density_tick,
             axislimit=density_axislimit, locator=density_locator,
             diagonal=density_diagonal, regressline=density_regressline,
             density=density,
@@ -914,11 +943,19 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
     else:
         print "::::::No output Pic {} : ".format(ymd)
         return
+    # 自动调整子图间距
+    plt.tight_layout()
 
-    fig.suptitle(title, fontsize=11, fontproperties=FONT0)
+    if isMonthly or not is_diagonal:
+        fig.subplots_adjust(bottom=0.12, top=0.86)
+    else:
+        fig.subplots_adjust(top=0.90)
+
+    FONT1.set_size(14)
+    fig.suptitle(title, fontsize=14, fontproperties=FONT1)
     pb_io.make_sure_path_exists(os.path.dirname(o_file))
     fig.savefig(o_file, dpi=100)
-    print o_file
+    print o_file + ".png"
     print "-" * 50
     fig.clear()
     plt.close()

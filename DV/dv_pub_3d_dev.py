@@ -42,16 +42,18 @@ FONT1 = get_ds_font()
 FONT_MONO = get_ds_font("DroidSansMono.ttf")
 
 
-def set_tick_font(ax, scale_size=10):
+def set_tick_font(ax, scale_size=11, color="#000000"):
     """
     设定刻度的字体
     """
     for tick in ax.xaxis.get_major_ticks():
         tick.label1.set_fontproperties(FONT0)
         tick.label1.set_fontsize(scale_size)
+        tick.label1.set_color(color)
     for tick in ax.yaxis.get_major_ticks():
         tick.label1.set_fontproperties(FONT0)
         tick.label1.set_fontsize(scale_size)
+        tick.label1.set_color(color)
 
 
 def add_title(titledict):
@@ -84,7 +86,7 @@ def add_label(ax, label, local, fontsize=11, fontproperties=FONT0):
         ax.set_ylabel(label, fontsize=fontsize, fontproperties=fontproperties)
 
 
-def add_annotate(ax, strlist, local, color="#303030", fontsize=11):
+def add_annotate(ax, strlist, local, color="#000000", fontsize=11):
     """
     添加上方注释文字
     loc must be "left" or "right"
@@ -103,44 +105,18 @@ def add_annotate(ax, strlist, local, color="#303030", fontsize=11):
     ylim = ax.get_ylim()
     if local == "left":
         ax.text(xlim[0] + x_toedge, ylim[1] - y_toedge,
-                "\n".join(strlist), ha=local, va="top", color=color,
+                "\n".join(strlist), ha="left", va="top", color=color,
                 fontsize=fontsize, fontproperties=FONT_MONO)
 
     elif local == "right":
         ax.text(xlim[1] - x_toedge, ylim[1] - y_toedge,
-                "\n".join(strlist), ha=local, va="top", color=color,
+                "\n".join(strlist), ha="right", va="top", color=color,
                 fontsize=fontsize, fontproperties=FONT_MONO)
 
-
-def add_annotate_bak(ax, strlist, loc, color="#303030", fontsize=11):
-    """
-    添加上方注释文字
-    loc must be "left" or "right"
-    格式[["annotate1", "annotate2"]]
-    """
-    if strlist is None:
-        return
-    xticklocs = ax.xaxis.get_ticklocs()
-    yticklocs = ax.yaxis.get_ticklocs()
-
-    x_step = (xticklocs[1] - xticklocs[0])
-    x_toedge = x_step / 6.
-    y_toedge = (yticklocs[1] - yticklocs[0]) / 6.
-
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    if loc == "left":
-        for eachCol in strlist:
-            ax.text(xlim[0] + x_toedge, ylim[1] - y_toedge,
-                    "\n".join(eachCol), ha=loc, va="top", color=color,
-                    fontsize=fontsize, fontproperties=FONT_MONO)
-            x_toedge = x_toedge + x_step * 1.4
-    elif loc == "right":
-        for eachCol in strlist:
-            ax.text(xlim[1] - x_toedge, ylim[1] - y_toedge,
-                    "\n".join(eachCol), ha=loc, va="top", color=color,
-                    fontsize=fontsize, fontproperties=FONT_MONO)
-            x_toedge = x_toedge + x_step * 1.4
+    elif local == "leftbottom":
+        ax.text(xlim[0] + x_toedge, ylim[0] + y_toedge,
+                "\n".join(strlist), ha="left", va="bottom", color=color,
+                fontsize=fontsize, fontproperties=FONT_MONO)
 
 
 def day_data_write(title, data, outFile):
@@ -370,12 +346,13 @@ def add_year_xaxis(ax, xlim_min, xlim_max):
     newax.xaxis.set_tick_params(length=5)
 
 
-def draw_regression(ax, x, y, label=None, ax_annotate=None,
+def draw_regression(ax, x, y, label=None, ax_annotate=None, tick=None,
                     axislimit=None, locator=None,
                     diagonal=None, regressline=None, scatter_point=None,
                     density=None, ):
     """
     画回归线图
+    :param tick:
     :param ax:
     :param x:
     :param y:
@@ -482,25 +459,31 @@ def draw_regression(ax, x, y, label=None, ax_annotate=None,
 
     # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
-        font_size = 10
+        font_size = ax_annotate.get("fontsize", 10)
         add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
         add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
 
     # 标签
     if label is not None:
-        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
-        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+        font_size = label.get("fontsize", 11)
+        add_label(ax, label.get("xlabel"), "xlabel", fontsize=font_size)  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel", fontsize=font_size)  # y 轴标签
 
     # 设置 tick 字体
-    set_tick_font(ax)
+    if tick is not None:
+        scale_size = tick.get("fontsize", 11)
+    else:
+        scale_size = 11
+    set_tick_font(ax, scale_size=scale_size)
 
 
-def draw_distribution(ax, x, y, label=None, ax_annotate=None,
+def draw_distribution(ax, x, y, label=None, ax_annotate=None, tick=None,
                       axislimit=None, locator=None,
                       avxline=None, zeroline=None, scatter_delta=None,
                       background_fill=None, regressline=None, ):
     """
     画偏差分布图
+    :param tick:
     :param ax:
     :param x:
     :param y:
@@ -629,24 +612,31 @@ def draw_distribution(ax, x, y, label=None, ax_annotate=None,
 
     # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
-        font_size = 10
+        font_size = ax_annotate.get("fontsize", 10)
         add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
         add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
+        add_annotate(ax, ax_annotate.get("leftbottom"), "leftbottom", fontsize=font_size)
 
     # 标签
     if label is not None:
-        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
-        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+        font_size = label.get("fontsize", 11)
+        add_label(ax, label.get("xlabel"), "xlabel", fontsize=font_size)  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel", fontsize=font_size)  # y 轴标签
 
     # 设置 tick 字体
-    set_tick_font(ax)
+    if tick is not None:
+        scale_size = tick.get("fontsize", 11)
+    else:
+        scale_size = 11
+    set_tick_font(ax, scale_size=scale_size)
 
 
-def draw_histogram(ax, x, label=None, ax_annotate=None,
+def draw_histogram(ax, x, label=None, ax_annotate=None, tick=None,
                    axislimit=None, locator=None,
                    histogram=None, ):
     """
     画直方图
+    :param tick:
     :param ax:
     :param x:
     :param label:
@@ -680,11 +670,12 @@ def draw_histogram(ax, x, label=None, ax_annotate=None,
         hist_color = histogram.get("color")
         hist_label = histogram.get("label")
         hist_bins = histogram.get("bins")
+        hist_label_size = histogram.get("fontsize", 10)
 
         ax.hist(x, hist_bins, range=(xmin, xmax), histtype="bar",
                 color=hist_color,
                 label=hist_label, alpha=hist_alpha)
-        ax.legend(prop={"size": 10})
+        ax.legend(prop={"size": hist_label_size})
 
     # 设定x y 轴的范围
     ax.set_xlim(xmin, xmax)
@@ -721,25 +712,31 @@ def draw_histogram(ax, x, label=None, ax_annotate=None,
 
     # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
-        font_size = 10
+        font_size = ax_annotate.get("fontsize", 10)
         add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
         add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
 
     # 标签
     if label is not None:
-        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
-        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+        font_size = label.get("fontsize", 11)
+        add_label(ax, label.get("xlabel"), "xlabel", fontsize=font_size)  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel", fontsize=font_size)  # y 轴标签
 
     # 设置 tick 字体
-    set_tick_font(ax)
+    if tick is not None:
+        scale_size = tick.get("fontsize", 11)
+    else:
+        scale_size = 11
+    set_tick_font(ax, scale_size=scale_size)
 
 
-def draw_bar(ax, x, y, label=None, ax_annotate=None,
+def draw_bar(ax, x, y, label=None, ax_annotate=None, tick=None,
              axislimit=None, locator=None,
              bar=None
              ):
     """
     画带有数字的 bar 图
+    :param tick:
     :param ax:
     :param x:
     :param y:
@@ -817,20 +814,25 @@ def draw_bar(ax, x, y, label=None, ax_annotate=None,
 
     # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
-        font_size = 10
+        font_size = ax_annotate.get("fontsize", 10)
         add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
         add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
 
     # 标签
     if label is not None:
-        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
-        add_label(ax, label.get("ylabel"), "ylabel")  # y 轴标签
+        font_size = label.get("fontsize", 11)
+        add_label(ax, label.get("xlabel"), "xlabel", fontsize=font_size)  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel", fontsize=font_size)  # y 轴标签
 
     # 设置 tick 字体
-    set_tick_font(ax)
+    if tick is not None:
+        scale_size = tick.get("fontsize", 11)
+    else:
+        scale_size = 11
+    set_tick_font(ax, scale_size=scale_size)
 
 
-def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
+def draw_timeseries(ax, x, y, label=None, ax_annotate=None, tick=None,
                     axislimit=None, locator=None,
                     zeroline=None, timeseries=None,
                     background_fill=None,
@@ -924,24 +926,24 @@ def draw_timeseries(ax, x, y, label=None, ax_annotate=None,
                 MultipleLocator(
                     (yticklocs[1] - yticklocs[0]) / minor_locator_y))
 
-    # 添加 x 轴年月标签文字
-    set_x_locator(ax, xmin, xmax)
-
     # 注释，格式 ["annotate1", "annotate2"]
     if ax_annotate is not None:
-        font_size = 10
-        add_annotate(ax, ax_annotate.get("left"), "left",
-                     fontsize=font_size)
-        add_annotate(ax, ax_annotate.get("right"), "right",
-                     fontsize=font_size)
+        font_size = ax_annotate.get("fontsize", 10)
+        add_annotate(ax, ax_annotate.get("left"), "left", fontsize=font_size)
+        add_annotate(ax, ax_annotate.get("right"), "right", fontsize=font_size)
 
     # 标签
     if label is not None:
-        add_label(ax, label.get("xlabel"), "xlabel")  # x 轴标签
-        add_label(ax, label.get("ylabel"), "ylabel", fontsize=11)  # y 轴标签
+        font_size = label.get("fontsize", 11)
+        add_label(ax, label.get("xlabel"), "xlabel", fontsize=font_size)  # x 轴标签
+        add_label(ax, label.get("ylabel"), "ylabel", fontsize=font_size)  # y 轴标签
 
     # 设置 tick 字体
-    set_tick_font(ax)
+    if tick is not None:
+        scale_size = tick.get("fontsize", 11)
+    else:
+        scale_size = 11
+    set_tick_font(ax, scale_size=scale_size)
 
 
 def get_dot_color(xlist, ylist):
