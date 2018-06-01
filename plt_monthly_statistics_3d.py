@@ -8,28 +8,24 @@ Created on 2016年1月6日
 import os
 import sys
 import calendar
-from datetime import datetime
-from multiprocessing import Pool, Lock
 
 import numpy as np
-from matplotlib.ticker import MultipleLocator
-
 from configobj import ConfigObj
-from dateutil.relativedelta import relativedelta
+
 from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
 from DV import dv_pub_3d
-from DV.dv_pub_3d import plt, mpl, mdates, Basemap
-from DV.dv_pub_3d import bias_information, day_data_write, get_bias_data, get_cabr_data, set_tick_font
+from DV.dv_pub_3d import plt
+from DV.dv_pub_3d import bias_information
 from DV.dv_pub_3d import FONT0, FONT_MONO, FONT1
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 from PB.CSC.pb_csc_console import LogServer
 from PB import pb_time, pb_io
 from PB.pb_time import is_day_timestamp_and_lon
 
-from plt_io import ReadHDF5, loadYamlCfg
+from plt_pb_io import ReadHDF5, loadYamlCfg
 
 
 def run(pair, ymd):
@@ -48,21 +44,21 @@ def run(pair, ymd):
     elif "FY3" in part1:
         Type = "LEOLEO"
     else:
-        Log.error("Cant distinguish the satellite type")
+        LOG.error("Cant distinguish the satellite type")
         return
 
     # 加载绘图配置文件
-    plt_cfg_file = os.path.join(MainPath, "%s_%s_3d.yaml" % (sensor1, sensor2))
+    plt_cfg_file = os.path.join(MAIN_PATH, "%s_%s_3d.yaml" % (sensor1, sensor2))
     plt_cfg = loadYamlCfg(plt_cfg_file)
     if plt_cfg is None:
-        Log.error("Not find the config file: {}".format(plt_cfg_file))
+        LOG.error("Not find the config file: {}".format(plt_cfg_file))
         return
 
     PERIOD = calendar.monthrange(int(ymd[:4]), int(ymd[4:6]))[1]  # 当月天数
     ym = ymd[:6]
     ymd = ym + '%02d' % PERIOD  # 当月最后一天
 
-    Log.info(u"----- Start Drawing Monthly TBBias Analysis Pic, PAIR: {}, YMD: {} -----".format(pair, ymd))
+    LOG.info(u"----- Start Drawing Monthly TBBias Analysis Pic, PAIR: {}, YMD: {} -----".format(pair, ymd))
     for each in plt_cfg['monthly_staistics']:
 
         # Day_Night must be in 'all', 'day', 'night'
@@ -74,7 +70,7 @@ def run(pair, ymd):
                     Day_Night.remove(i)
 
         for idx, chan in enumerate(plt_cfg[each]['chan']):
-            Log.info(u"Start Drawing {} Channel {}".format(each, chan))
+            LOG.info(u"Start Drawing {} Channel {}".format(each, chan))
             oneHDF5 = ReadHDF5()
             # load Matched HDF5
             num_file = PERIOD
@@ -83,17 +79,17 @@ def run(pair, ymd):
                 nc_name = 'COLLOC+%sIR,%s_C_BABJ_%s.hdf5' % (Type, pair, cur_ymd)
                 filefullpath = os.path.join(MATCH_DIR, pair, nc_name)
                 if not os.path.isfile(filefullpath):
-                    Log.info(u"HDF5 not found: {}".format(filefullpath))
+                    LOG.info(u"HDF5 not found: {}".format(filefullpath))
                     num_file -= 1
                     continue
                 if not oneHDF5.LoadData(filefullpath, chan):
-                    Log.error('Error occur when reading %s of %s' % (chan, filefullpath))
+                    LOG.error('Error occur when reading %s of %s' % (chan, filefullpath))
 
             if num_file == 0:
-                Log.error(u"No file found.")
+                LOG.error(u"No file found.")
                 continue
             elif num_file != PERIOD:
-                Log.info(u"{} of {} file(s) found.".format(num_file, PERIOD))
+                LOG.info(u"{} of {} file(s) found.".format(num_file, PERIOD))
 
             # 输出目录
             cur_path = os.path.join(MBA_DIR, pair, ymd[:6])
@@ -158,14 +154,14 @@ def run(pair, ymd):
             if hasattr(oneHDF5, dset_name):
                 x = getattr(oneHDF5, dset_name)
             else:
-                Log.error("Can't plot, no %s in HDF5 class" % dset_name)
+                LOG.error("Can't plot, no %s in HDF5 class" % dset_name)
                 continue
             # get y
             dset_name = yname + "2"
             if hasattr(oneHDF5, dset_name):
                 y = getattr(oneHDF5, dset_name)
             else:
-                Log.error("Can't plot, no %s in HDF5 class" % dset_name)
+                LOG.error("Can't plot, no %s in HDF5 class" % dset_name)
                 continue
             if 'rad' == bias:
                 o_name = 'RadBiasMonthStats'
@@ -176,7 +172,7 @@ def run(pair, ymd):
             else:
                 o_name = 'DUMMY'
             if x.size < 10:
-                Log.error("Not enough match point to draw.")
+                LOG.error("Not enough match point to draw.")
                 continue
 
             # 获取 std
@@ -241,7 +237,7 @@ def plot(x, y, weight, picPath,
     x: 参考卫星传感器数据
     y: FY数据
     """
-    plt.style.use(os.path.join(dvPath, 'dv_pub_regression.mplstyle'))
+    plt.style.use(os.path.join(DV_PATH, 'dv_pub_regression.mplstyle'))
     if xname_l == "TBB":
         xname_l = "TB"
 
@@ -492,70 +488,42 @@ def get_bar_data(xx, delta, Tmin, Tmax, step):
 ######################### 程序全局入口 ##############################
 if __name__ == "__main__":
     # 获取程序参数接口
-    args = sys.argv[1:]
-    help_info = \
-        u'''
-            【参数1】：FY3A+MERSI_AQUA+MODIS(样例，具体参见global.cfg 标签PAIRS下的标识)
-            【参数2】：yyyymmdd-yyyymmdd
-        '''
-    if '-h' in args:
-        print help_info
+    ARGS = sys.argv[1:]
+    HELP_INFO = \
+        u"""
+        [参数1]：pair 卫星对
+        [参数2]：yyyymm 时间
+        [样例]: python app.py pair yyyymm
+        """
+    if "-h" in ARGS:
+        print HELP_INFO
         sys.exit(-1)
 
     # 获取程序所在位置，拼接配置文件
-    MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-    ProjPath = os.path.dirname(MainPath)
-    omPath = os.path.dirname(ProjPath)
-    dvPath = os.path.join(os.path.dirname(omPath), 'DV')
-    cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
-    omdFile = os.path.join(ProjPath, 'cfg', 'dm_odm.cfg')
+    MAIN_PATH, MAIN_FILE = os.path.split(os.path.realpath(__file__))
+    PROJECT_PATH = os.path.dirname(MAIN_PATH)
+    OM_PATH = os.path.dirname(PROJECT_PATH)
+    DV_PATH = os.path.join(os.path.dirname(OM_PATH), "DV")
+    CONFIG_FILE = os.path.join(PROJECT_PATH, "cfg", "global.cfg")
+    YAML_FILE = os.path.join(MAIN_PATH, "global.yaml")
 
     # 配置不存在预警
-    if not os.path.isfile(cfgFile):
-        print (u'配置文件不存在 %s' % cfgFile)
+    if not os.path.isfile(CONFIG_FILE):
+        print (u"配置文件不存在 %s" % CONFIG_FILE)
         sys.exit(-1)
 
     # 载入配置文件
-    inCfg = ConfigObj(cfgFile)
-    MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
-    MBA_DIR = inCfg['PATH']['OUT']['MBA']
-    LogPath = inCfg['PATH']['OUT']['LOG']
-    Log = LogServer(LogPath)
+    GLOBAL_CONFIG = ConfigObj(CONFIG_FILE)
+    MATCH_DIR = GLOBAL_CONFIG['PATH']['MID']['MATCH_DATA']
+    MBA_DIR = GLOBAL_CONFIG['PATH']['OUT']['MBA']
+    LOG_PATH = GLOBAL_CONFIG["PATH"]["OUT"]["LOG"]
+    LOG = LogServer(LOG_PATH)
 
-    # 获取开机线程的个数，开启线程池。
-    threadNum = inCfg['CROND']['threads']
-    pool = Pool(processes=int(threadNum))
+    if len(ARGS) == 2:
+        PAIR = ARGS[0]
+        YMD = ARGS[1]
 
-    if len(args) == 2:
-        Log.info(u'手动月统计绘图程序开始运行-----------------------------')
-        satPair = args[0]
-        str_time = args[1]
-        date_s, date_e = pb_time.arg_str2date(str_time)
-
-        while date_s <= date_e:
-            ymd_day = date_s.strftime('%Y%m%d')
-            # run(satPair, ymd_day)
-            pool.apply_async(run, (satPair, ymd_day))
-            date_s = date_s + relativedelta(months=1)
-        pool.close()
-        pool.join()
-    elif len(args) == 0:
-        Log.info(u'自动月统计绘图程序开始运行 -----------------------------')
-        rolldays = inCfg['CROND']['rolldays']
-        pairLst = inCfg['PAIRS'].keys()
-        # 定义参数List，传参给线程池
-        args_List = []
-        for satPair in pairLst:
-            ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
-            if ProjMode1 == 0:
-                continue
-            # 增加一个月的作业,默认当前月和上一个月
-            ymd_month = (datetime.utcnow()).strftime('%Y%m%d')
-            ymd_last_month = (datetime.utcnow() - relativedelta(months=1)).strftime('%Y%m%d')
-            pool.apply_async(run, (satPair, ymd_month))
-            pool.apply_async(run, (satPair, ymd_last_month))
-        pool.close()
-        pool.join()
+        run(PAIR, YMD)
     else:
-        print 'args: FY3A+MERSI_AQUA+MODIS yyyymmdd-yyyymmdd '
+        print HELP_INFO
         sys.exit(-1)

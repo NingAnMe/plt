@@ -8,7 +8,6 @@ import os
 import numpy as np
 import h5py
 import yaml
-from configobj import ConfigObj
 
 
 class ReadHDF5(object):
