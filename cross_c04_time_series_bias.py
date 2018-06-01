@@ -21,16 +21,18 @@ from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
-from DV import dv_pub_3d_dev
-from DV.dv_pub_3d_dev import plt, mpl, mdates, Basemap
-from DV.dv_pub_3d_dev import bias_information, day_data_write, get_bias_data, get_cabr_data, set_tick_font
-from DV.dv_pub_3d_dev import FONT0, FONT_MONO, FONT1
-from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 from PB.CSC.pb_csc_console import LogServer
 from PB import pb_time, pb_io
+
+from DV import dv_pub_3d
+from DV.dv_pub_3d import plt, mpl, mdates, Basemap
+from DV.dv_pub_3d import bias_information, day_data_write, get_bias_data, get_cabr_data, set_tick_font
+from DV.dv_pub_3d import FONT0, FONT_MONO, FONT1
+from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
+
 from PB.pb_time import is_day_timestamp_and_lon
 
-from plt_pb_io import ReadHDF5, loadYamlCfg
+from cross_pb_io import ReadHDF5, loadYamlCfg
 
 
 def run(pair, date_s, date_e):
@@ -56,7 +58,7 @@ def run(pair, date_s, date_e):
         return
 
     # 加载绘图配置文件
-    plt_cfg_file = os.path.join(MainPath, "%s_%s_3d.yaml" % (sensor1, sensor2))
+    plt_cfg_file = os.path.join(MAIN_PATH, "cfg", "%s_%s_3d.yaml" % (sensor1, sensor2))
     plt_cfg = loadYamlCfg(plt_cfg_file)
     if plt_cfg is None:
         Log.error("Not find the config file: {}".format(plt_cfg_file))
@@ -64,8 +66,8 @@ def run(pair, date_s, date_e):
 
     # 设置开始时间和结束时间
     if isLaunch:
-        if sat1 in inCfg['LUANCH_DATE']:
-            date_s = pb_time.ymd2date(str(inCfg['LUANCH_DATE'][sat1]))
+        if sat1 in GLOBAL_CONFIG['LUANCH_DATE']:
+            date_s = pb_time.ymd2date(str(GLOBAL_CONFIG['LUANCH_DATE'][sat1]))
             date_e = datetime.utcnow()
         else:
             Log.error('%s not in LUANCH_DATE of Cfg, use the first day in txt instead.')
@@ -327,7 +329,7 @@ def plot_abc(date_D, a_D, b_D, c_D,
              date_s, date_e,
              slope_min, slope_max,
              var):
-    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    plt.style.use(os.path.join(DV_PATH, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 6))
     ax1 = plt.subplot(311)
     ax2 = plt.subplot(312, sharex=ax1)
@@ -453,7 +455,7 @@ def plot_omb(date_D, a_D, b_D,
     """
     画偏差时序彩色图
     """
-    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    plt.style.use(os.path.join(DV_PATH, 'dv_pub_timeseries.mplstyle'))
     if (np.isnan(a_D)).all():
         Log.error('Everything is NaN: %s' % picPath)
         return
@@ -548,7 +550,7 @@ def plot_md(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
     if (np.isnan(data_d)).all():
         Log.error('Everything is NaN: %s' % pic_path)
         return
-    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    plt.style.use(os.path.join(DV_PATH, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
     # fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
 
@@ -615,7 +617,7 @@ def plot_md(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
         "markersize": 6, "markerfacecolor": None, "markeredgecolor": BLUE,
         "alpha": 0.8, "markeredgewidth": 0.3, "label": "Daily",
     }
-    dv_pub_3d_dev.draw_timeseries(
+    dv_pub_3d.draw_timeseries(
         ax1, date_d, data_d, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_daily,
@@ -628,7 +630,7 @@ def plot_md(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
     background_fill_timeseries = {
         'x': date_m, 'y': data_m - std_m, 'y1': data_m + std_m, "color": RED,
     }
-    dv_pub_3d_dev.draw_timeseries(
+    dv_pub_3d.draw_timeseries(
         ax1, date_m, data_m, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_monthly,
@@ -672,7 +674,7 @@ def plot_tbbias(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
     if (np.isnan(data_d)).all():
         Log.error('Everything is NaN: %s' % pic_path)
         return
-    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    plt.style.use(os.path.join(DV_PATH, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
     # fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
 
@@ -726,7 +728,7 @@ def plot_tbbias(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
         "markersize": 6, "markerfacecolor": None, "markeredgecolor": BLUE,
         "alpha": 0.8, "markeredgewidth": 0.3, "label": "Daily",
     }
-    dv_pub_3d_dev.draw_timeseries(
+    dv_pub_3d.draw_timeseries(
         ax1, date_d, data_d, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_daily,
@@ -739,7 +741,7 @@ def plot_tbbias(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
     background_fill_timeseries = {
         'x': date_m, 'y': data_m - std_m, 'y1': data_m + std_m, "color": RED,
     }
-    dv_pub_3d_dev.draw_timeseries(
+    dv_pub_3d.draw_timeseries(
         ax1, date_m, data_m, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_monthly,
@@ -780,7 +782,7 @@ def plot_rmd(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
     if (np.isnan(data_d)).all():
         Log.error('Everything is NaN: %s' % pic_path)
         return
-    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    plt.style.use(os.path.join(DV_PATH, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
     # fig.subplots_adjust(top=0.88, bottom=0.11, left=0.12, right=0.97)
 
@@ -833,7 +835,7 @@ def plot_rmd(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
         "markersize": 6, "markerfacecolor": None, "markeredgecolor": BLUE,
         "alpha": 0.8, "markeredgewidth": 0.3, "label": "Daily",
     }
-    dv_pub_3d_dev.draw_timeseries(
+    dv_pub_3d.draw_timeseries(
         ax1, date_d, data_d, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_daily,
@@ -846,7 +848,7 @@ def plot_rmd(date_d, data_d, date_m, data_m, std_m, pic_path, date_s, date_e,
     background_fill_timeseries = {
         'x': date_m, 'y': data_m - std_m, 'y1': data_m + std_m, "color": RED,
     }
-    dv_pub_3d_dev.draw_timeseries(
+    dv_pub_3d.draw_timeseries(
         ax1, date_m, data_m, label=timeseries_label,
         axislimit=timeseries_axislimit, locator=timeseries_locator,
         zeroline=timeseries_zeroline, timeseries=timeseries_monthly,
@@ -939,77 +941,47 @@ def add_year_xaxis(ax, xlim_min, xlim_max):
 ######################### 程序全局入口 ##############################
 if __name__ == "__main__":
     # 获取程序参数接口
-    args = sys.argv[1:]
-    help_info = \
-        u'''
-        [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
-        [参数样例2]：SAT1+SENSOR1_SAT2+SENSOR2
-        [参数样例3]：处理所有卫星对
-        '''
-    if '-h' in args:
-        print help_info
+    ARGS = sys.argv[1:]
+    HELP_INFO = \
+        u"""
+        [参数1]：pair 卫星对
+        [参数2]：yyyymmdd-yyyymmdd 时间范围
+        [样例]: python app.py pair yyyymmdd-yyyymmdd
+        """
+    if "-h" in ARGS:
+        print HELP_INFO
         sys.exit(-1)
 
     # 获取程序所在位置，拼接配置文件
-    MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-    ProjPath = os.path.dirname(MainPath)
-    omPath = os.path.dirname(ProjPath)
-    dvPath = os.path.join(os.path.dirname(omPath), 'DV')
-    cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
+    MAIN_PATH, MAIN_FILE = os.path.split(os.path.realpath(__file__))
+    PROJECT_PATH = os.path.dirname(MAIN_PATH)
+    OM_PATH = os.path.dirname(PROJECT_PATH)
+    DV_PATH = os.path.join(os.path.dirname(OM_PATH), "DV")
+    CONFIG_FILE = os.path.join(PROJECT_PATH, "cfg", "global.cfg")
 
     # 配置不存在预警
-    if not os.path.isfile(cfgFile):
-        print (u'配置文件不存在 %s' % cfgFile)
+    if not os.path.isfile(CONFIG_FILE):
+        print (u"配置文件不存在 %s" % CONFIG_FILE)
         sys.exit(-1)
+
     # 载入配置文件
-    inCfg = ConfigObj(cfgFile)
-    MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
-    ABR_DIR = inCfg['PATH']['OUT']['ABR']
-    OMB_DIR = inCfg['PATH']['OUT']['OMB']
-    ABC_DIR = inCfg['PATH']['OUT']['ABC']
-    LogPath = inCfg['PATH']['OUT']['LOG']
+    GLOBAL_CONFIG = ConfigObj(CONFIG_FILE)
+    MATCH_DIR = GLOBAL_CONFIG['PATH']['MID']['MATCH_DATA']
+    ABR_DIR = GLOBAL_CONFIG['PATH']['OUT']['ABR']
+    OMB_DIR = GLOBAL_CONFIG['PATH']['OUT']['OMB']
+    ABC_DIR = GLOBAL_CONFIG['PATH']['OUT']['ABC']
+    LogPath = GLOBAL_CONFIG['PATH']['OUT']['LOG']
     Log = LogServer(LogPath)
 
     # 开启进程池
-    threadNum = inCfg['CROND']['threads']
+    threadNum = GLOBAL_CONFIG['CROND']['threads']
     pool = Pool(processes=int(threadNum))
 
-    if len(args) == 2:
-        Log.info(u'手动长时间序列绘图程序开始运行-----------------------------')
-        satPair = args[0]
-        str_time = args[1]
+    if len(ARGS) == 2:
+        satPair = ARGS[0]
+        str_time = ARGS[1]
         date_start, date_end = pb_time.arg_str2date(str_time)
         run(satPair, date_start, date_end)
-        Log.info(u'SUCCESS，手动长时间序列绘图程序-----------------------------')
-
-    elif len(args) == 1:
-        Log.info(u'手动长时间序列绘图程序开始运行 -----------------------------')
-        satPair = args[0]
-        run(satPair, None, None)
-        Log.info(u'SUCCESS，手动长时间序列绘图程序-----------------------------')
-
-    elif len(args) == 0:
-        Log.info(u'自动长时间序列绘图程序开始运行 -----------------------------')
-        rolldays = inCfg['CROND']['rolldays']
-        pairLst = inCfg['PAIRS'].keys()
-        # 定义参数List，传参给线程池
-        args_List = []
-        for satPair in pairLst:
-            ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
-            if ProjMode1 == 0:
-                continue
-
-            for rdays in rolldays:
-                date_end = datetime.utcnow() - relativedelta(days=int(rdays))
-                dateYearAgo = date_end - relativedelta(years=1)
-                # 处理一年的时间序列
-                pool.apply_async(run, (satPair, dateYearAgo, date_end))
-            # 处理发星以来的时间序列
-            pool.apply_async(run, (satPair, None, None))
-        pool.close()
-        pool.join()
-        Log.info(u'SUCCESS，自动长时间序列绘图程序-----------------------------')
-
     else:
-        print 'args error'
+        print HELP_INFO
         sys.exit(-1)

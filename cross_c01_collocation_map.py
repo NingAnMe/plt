@@ -19,7 +19,7 @@ from PB.CSC.pb_csc_console import LogServer
 from PB import pb_time, pb_io
 from PB.pb_time import is_day_timestamp_and_lon
 
-from plt_pb_io import ReadHDF5, loadYamlCfg
+from cross_pb_io import ReadHDF5, loadYamlCfg
 
 
 def run(pair, ymd):
