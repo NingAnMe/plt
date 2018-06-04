@@ -1,9 +1,9 @@
 # coding: utf-8
 """
-Created on 2016年1月6日
+Created on 2018-06-01
 读取匹配后的 HDF5 文件，画散点回归图，生成 abr 文件
 
-@author: duxiang, zhangtao, anning
+@author: anning
 """
 import os
 import sys
@@ -12,7 +12,6 @@ from datetime import datetime
 from multiprocessing import Pool, Lock
 
 import numpy as np
-from matplotlib.ticker import MultipleLocator
 
 from configobj import ConfigObj
 from dateutil.relativedelta import relativedelta
@@ -21,48 +20,63 @@ from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
 from DV import dv_pub_3d
-from DV.dv_pub_3d import plt, mpl, mdates, Basemap
-from DV.dv_pub_3d import bias_information, day_data_write, get_bias_data, get_cabr_data, set_tick_font
-from DV.dv_pub_3d import FONT0, FONT_MONO, FONT1
+from DV.dv_pub_3d import plt
+from DV.dv_pub_3d import bias_information, day_data_write, get_bias_data, get_cabr_data
+from DV.dv_pub_3d import FONT1
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
-from PB.CSC.pb_csc_console import LogServer
+from PB.CSC.pb_csc_console import LOGServer
 from PB import pb_time, pb_io
 from PB.pb_time import is_day_timestamp_and_lon
 
-from plt_io import ReadHDF5, loadYamlCfg
+from cross_pb_io import ReadHDF5, loadYamlCfg
 
 lock = Lock()
 
 
-def run(pair, ymd, is_monthly):
+def main(pair, ymd):
     """
     pair: sat1+sensor1_sat2+sensor2
     ymd: str YYYYMMDD
     """
+    ######################### 初始化 ###########################
     # 提取参数中的卫星信息和传感器信息
     part1, part2 = pair.split("_")
     sat1, sensor1 = part1.split("+")
     sat2, sensor2 = part2.split("+")
+    sensor_pair = "{}_{}".format(sensor1, sensor2)
 
     # 判断是静止卫星还是动态卫星
     if "FY2" in part1 or "FY4" in part1:
-        Type = "GEOLEO"
+        sat_type = "GEOLEO"
     elif "FY3" in part1:
-        Type = "LEOLEO"
+        sat_type = "LEOLEO"
     else:
-        Log.error("Cant distinguish the satellite type")
+        LOG.error("Cant distinguish the satellite type")
         return
 
     # 加载绘图配置文件
-    plt_cfg_file = os.path.join(MainPath, "%s_%s_3d.yaml" % (sensor1, sensor2))
+    plt_cfg_file = os.path.join(MAIN_PATH, "%s_%s_3d.yaml" % (sensor1, sensor2))
     plt_cfg = loadYamlCfg(plt_cfg_file)
     if plt_cfg is None:
-        Log.error("Not find the config file: {}".format(plt_cfg_file))
+        LOG.error("Not find the config file: {}".format(plt_cfg_file))
         return
+    else:
+        # 加载配置信息
+        try:
+            physics_pair = plt_cfg["regression"]  # 需要处理的物理量对
+            if pb_io.is_none(physics_pair):
+                LOG.error("Yaml args is not completion. : {}".format(plt_cfg_file))
+                return
+        except ValueError:
+            LOG.error("Load yaml config file error, please check it. : {}".format(plt_cfg_file))
+            return
 
-    Log.info(u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(pair, ymd))
+    ######################### 开始处理 ###########################
+    print '-' * 100
+    print 'Start regression daily.'
 
-    for each in plt_cfg["regression"]:
+    # 循环处理每个物理量对
+    for each in physics_pair:
         dict_cabr = {}
         dict_cabr_d = {}
         dict_cabr_n = {}
@@ -70,40 +84,35 @@ def run(pair, ymd, is_monthly):
         dict_bias_d = {}
         dict_bias_n = {}
 
-        # 需要回滚的天数
-        if is_monthly:
-            PERIOD = calendar.monthrange(int(ymd[:4]), int(ymd[4:6]))[1]  # 当月天数
-            ymd = ymd[:6] + "%02d" % PERIOD  # 当月最后一天
-        else:
-            PERIOD = plt_cfg[each]["days"]
+        period = plt_cfg[each]["days"]  # 回滚天数
 
         # must be in "all", "day", "night"
-        Day_Night = ["all", "day", "night"]
+        day_night = ["all", "day", "night"]
         if "time" in plt_cfg[each].keys():
-            Day_Night = plt_cfg[each]["time"]
-            for t in Day_Night:
+            day_night = plt_cfg[each]["time"]
+            for t in day_night:
                 if t not in ["all", "day", "night"]:
-                    Day_Night.remove(t)
+                    day_night.remove(t)
 
         for idx, chan in enumerate(plt_cfg[each]["chan"]):
-            Log.info(u"Start Drawing {} Channel {}".format(each, chan))
+            LOG.info(u"Start Drawing {} Channel {}".format(each, chan))
             oneHDF5 = ReadHDF5()
-            num_file = PERIOD
-            for daydelta in xrange(PERIOD):
+            num_file = period
+            for daydelta in xrange(period):
                 cur_ymd = pb_time.ymd_plus(ymd, -daydelta)
-                hdf5_name = "COLLOC+%sIR,%s_C_BABJ_%s.hdf5" % (Type, pair, cur_ymd)
+                hdf5_name = "COLLOC+%sIR,%s_C_BABJ_%s.hdf5" % (sat_type, pair, cur_ymd)
                 filefullpath = os.path.join(MATCH_DIR, pair, hdf5_name)
                 if not os.path.isfile(filefullpath):
-                    Log.info(u"File not found: {}".format(filefullpath))
+                    LOG.info(u"File not found: {}".format(filefullpath))
                     num_file -= 1
                     continue
                 if not oneHDF5.LoadData(filefullpath, chan):
-                    Log.error("Error occur when reading %s of %s" % (chan, filefullpath))
+                    LOG.error("Error occur when reading %s of %s" % (chan, filefullpath))
             if num_file == 0:
-                Log.error(u"No file found.")
+                LOG.error(u"No file found.")
                 continue
-            elif num_file != PERIOD:
-                Log.error(u"{} of {} file(s) found.".format(num_file, PERIOD))
+            elif num_file != period:
+                LOG.error(u"{} of {} file(s) found.".format(num_file, period))
 
             if is_monthly:
                 str_time = ymd[:6]
@@ -149,7 +158,7 @@ def run(pair, ymd, is_monthly):
                     oneHDF5.lon2) > 0 else oneHDF5.lon2
 
             # find out day and night
-            if ("day" in Day_Night or "night" in Day_Night) and len(oneHDF5.time) > 0:
+            if ("day" in day_night or "night" in day_night) and len(oneHDF5.time) > 0:
                 vect_is_day = np.vectorize(is_day_timestamp_and_lon)
                 day_index = vect_is_day(oneHDF5.time, oneHDF5.lon1)
                 night_index = np.logical_not(day_index)
@@ -183,7 +192,7 @@ def run(pair, ymd, is_monthly):
             elif "dn" in xname:
                 x = oneHDF5.dn1
             else:
-                Log.error("Can't plot %s" % each)
+                LOG.error("Can't plot %s" % each)
                 continue
             if "rad" in yname:
                 y = oneHDF5.rad2
@@ -192,7 +201,7 @@ def run(pair, ymd, is_monthly):
             elif "ref" in yname:
                 y = oneHDF5.ref2
             else:
-                Log.error("Can't plot %s" % each)
+                LOG.error("Can't plot %s" % each)
                 continue
 
             if "rad" in xname and "rad" in yname:
@@ -214,32 +223,32 @@ def run(pair, ymd, is_monthly):
             else:
                 diagonal = False
 
-            if "all" in Day_Night and o_name not in dict_cabr:
+            if "all" in day_night and o_name not in dict_cabr:
                 dict_cabr[o_name] = {}
                 dict_bias[xname] = {}
-            if "day" in Day_Night and o_name not in dict_cabr_d:
+            if "day" in day_night and o_name not in dict_cabr_d:
                 dict_cabr_d[o_name] = {}
                 dict_bias_d[xname] = {}
-            if "night" in Day_Night and o_name not in dict_cabr_n:
+            if "night" in day_night and o_name not in dict_cabr_n:
                 dict_cabr_n[o_name] = {}
                 dict_bias_n[xname] = {}
 
             # 对样本点数量进行判断，如果样本点少于 100 个，则不进行绘制
             if x.size < 100:
-                Log.error("Not enough match point to draw: {}, {}".format(each, chan))
-                if "all" in Day_Night:
+                LOG.error("Not enough match point to draw: {}, {}".format(each, chan))
+                if "all" in day_night:
                     dict_cabr[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_bias[xname][chan] = [np.NaN, np.NaN]
-                if "day" in Day_Night:
+                if "day" in day_night:
                     dict_cabr_d[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_bias_d[xname][chan] = [np.NaN, np.NaN]
-                if "night" in Day_Night:
+                if "night" in day_night:
                     dict_cabr_n[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_bias_n[xname][chan] = [np.NaN, np.NaN]
                 continue
 
             # regression starts
-            if "all" in Day_Night:
+            if "all" in day_night:
                 o_file = os.path.join(cur_path,
                                       "%s_%s_%s_ALL_%s" % (
                                           pair, o_name, chan, str_time))
@@ -259,7 +268,7 @@ def run(pair, ymd, is_monthly):
                     dict_bias[xname][chan] = [np.NaN, np.NaN]
 
             # ------- day ----------
-            if "day" in Day_Night:
+            if "day" in day_night:
                 if day_index is not None and np.where(day_index)[0].size > 10:
                     o_file = os.path.join(cur_path,
                                           "%s_%s_%s_Day_%s" % (
@@ -286,7 +295,7 @@ def run(pair, ymd, is_monthly):
                     dict_cabr_d[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_bias_d[xname][chan] = [np.NaN, np.NaN]
             # ---------night ------------
-            if "night" in Day_Night:
+            if "night" in day_night:
                 if night_index is not None and np.where(night_index)[0].size > 10:
                     o_file = os.path.join(cur_path, "%s_%s_%s_Night_%s" % (
                         pair, o_name, chan, str_time))
@@ -316,19 +325,19 @@ def run(pair, ymd, is_monthly):
         # write txt
         lock.acquire()
         channel = plt_cfg[each]["chan"]
-        if "all" in Day_Night:
+        if "all" in day_night:
             for o_name in dict_cabr:
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_bias, "ALL")
                 write_cabr(channel, part1, part2, o_name, ymd,
                            dict_cabr, "ALL")
-        if "day" in Day_Night:
+        if "day" in day_night:
             for o_name in dict_cabr_d:
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_bias_d, "Day")
                 write_cabr(channel, part1, part2, o_name, ymd,
                            dict_cabr_d, "Day")
-        if "night" in Day_Night:
+        if "night" in day_night:
             for o_name in dict_cabr_n:
                 write_bias(channel, part1, part2, xname, ymd,
                            dict_bias_n, "Night")
@@ -360,7 +369,8 @@ def write_cabr(channel, part1, part2, o_name, ymd,
                 part1, part2, o_name, chan, day_or_night))
 
         # 写入日数据
-        title_daily = ("{:15}  " * 5).format("YMD", "Count", "Slope", "Intercept", "RSquared") + "\n"
+        title_daily = ("{:15}  " * 5).format("YMD", "Count", "Slope", "Intercept",
+                                             "RSquared") + "\n"
         c, a, b, r = dict_cabr[o_name][chan]
         data_daily = ("{:15}  " * 5).format(ymd, c, a, b, r) + "\n"
         day_data_write(title_daily, data_daily, file_name_daily)
@@ -368,7 +378,8 @@ def write_cabr(channel, part1, part2, o_name, ymd,
         # 写入月数据
         cabr_data = get_cabr_data(file_name_daily)
         title_monthly = ("{:15}  " * 8).format("YMD", "Count", "Slope", "Slope_STD",
-                                               "Intercept", "Intercept_STD", "RSquared", "RSquared_STD") + "\n"
+                                               "Intercept", "Intercept_STD", "RSquared",
+                                               "RSquared_STD") + "\n"
         date_data = cabr_data["date"]
 
         if len(date_data) <= 2:  # 如果小于2天的数据，不计算月平均
@@ -396,7 +407,8 @@ def write_cabr(channel, part1, part2, o_name, ymd,
             intercept_std_monthly = data[6]
             rsquared_std_monthly = data[7]
 
-            data_str = ("{:15}  " * 8).format(ymd_monthly, count_monthly, slope_mean_monthly, slope_std_monthly,
+            data_str = ("{:15}  " * 8).format(ymd_monthly, count_monthly, slope_mean_monthly,
+                                              slope_std_monthly,
                                               intercept_mean_monthly, intercept_std_monthly,
                                               rsquared_mean_monthly, rsquared_std_monthly) + "\n"
             day_data_write(title_monthly, data_str, file_name_monthly)
@@ -559,7 +571,7 @@ def month_average(day_date, day_data):
 def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
          xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax,
          is_diagonal, is_monthly):
-    plt.style.use(os.path.join(dvPath, "dv_pub_regression.mplstyle"))
+    plt.style.use(os.path.join(DV_PATH, "dv_pub_regression.mplstyle"))
 
     # 过滤 正负 delta+8 倍 std 的杂点 ------------------------
     w = 1.0 / weight if weight is not None else None
@@ -989,46 +1001,42 @@ def G_reg1d(xx, yy, ww=None):
 ######################### 程序全局入口 ##############################
 if __name__ == "__main__":
     # 获取程序参数接口
-    args = sys.argv[1:]
-    help_info = \
+    ARGS = sys.argv[1:]
+    HELP_INFO = \
         u"""
         [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
         [参数样例2]：处理所有卫星对
         """
-    if "-h" in args:
-        print help_info
+    if "-h" in ARGS:
+        print HELP_INFO
         sys.exit(-1)
 
     # 获取程序所在位置，拼接配置文件
-    MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-    ProjPath = os.path.dirname(MainPath)
-    omPath = os.path.dirname(ProjPath)
-    dvPath = os.path.join(os.path.dirname(omPath), "DV")
-    cfgFile = os.path.join(ProjPath, "cfg", "global.cfg")
+    MAIN_PATH, MAIN_FILE = os.path.split(os.path.realpath(__file__))
+    PROJECT_PATH = os.path.dirname(MAIN_PATH)
+    OM_PATH = os.path.dirname(PROJECT_PATH)
+    DV_PATH = os.path.join(os.path.dirname(OM_PATH), "DV")
+    CONFIG_FILE = os.path.join(PROJECT_PATH, "cfg", "global.cfg")
+    YAML_FILE = os.path.join(MAIN_PATH, "global.yaml")
 
     # 配置不存在预警
-    if not os.path.isfile(cfgFile):
-        print (u"配置文件不存在 %s" % cfgFile)
+    if not os.path.isfile(CONFIG_FILE):
+        print (u"配置文件不存在 %s" % CONFIG_FILE)
         sys.exit(-1)
 
     # 载入配置文件
-    inCfg = ConfigObj(cfgFile)
-    MATCH_DIR = inCfg["PATH"]["MID"]["MATCH_DATA"]
-    DRA_DIR = inCfg["PATH"]["OUT"]["DRA"]
-    MRA_DIR = inCfg["PATH"]["OUT"]["MRA"]
-    ABR_DIR = inCfg["PATH"]["OUT"]["ABR"]
-    LogPath = inCfg["PATH"]["OUT"]["LOG"]
-    Log = LogServer(LogPath)
+    GLOBAL_CONFIG = ConfigObj(CONFIG_FILE)
+    MATCH_DIR = GLOBAL_CONFIG["PATH"]["MID"]["MATCH_DATA"]
+    DRA_DIR = GLOBAL_CONFIG["PATH"]["OUT"]["DRA"]
+    MRA_DIR = GLOBAL_CONFIG["PATH"]["OUT"]["MRA"]
+    ABR_DIR = GLOBAL_CONFIG["PATH"]["OUT"]["ABR"]
+    LOG_PATH = GLOBAL_CONFIG["PATH"]["OUT"]["LOG"]
+    LOG = LOGServer(LOG_PATH)
 
-    # 开启进程池
-    threadNum = inCfg["CROND"]["threads"]
-    # threadNum = "10"
-    pool = Pool(processes=int(threadNum))
-
-    if len(args) == 2:
-        Log.info(u"手动日月回归分析程序开始运行-----------------------------")
-        satPair = args[0]
-        str_time = args[1]
+    if len(ARGS) == 2:
+        LOG.info(u"手动日月回归分析程序开始运行-----------------------------")
+        satpair = ARGS[0]
+        str_time = ARGS[1]
         date_s, date_e = pb_time.arg_str2date(str_time)
         isMonthly = False
         if len(str_time) == 13:
@@ -1040,42 +1048,42 @@ if __name__ == "__main__":
             print "time format error  yyyymmdd-yyyymmdd or yyyymm-yyyymm"
             sys.exit(-1)
         # 定义参数List，传参给线程池
-        args_List = []
+        ARGS_List = []
 
         while date_s <= date_e:
             ymd_day = date_s.strftime("%Y%m%d")
-            # run(satPair, ymd_day, isMonthly)
-            pool.apply_async(run, (satPair, ymd_day, isMonthly))
+            # main(satpair, ymd_day, isMonthly)
+            pool.apply_async(main, (satpair, ymd_day, isMonthly))
             date_s = date_s + timeStep
 
         pool.close()
         pool.join()
 
-    elif len(args) == 0:
-        Log.info(u"自动日月回归分析程序开始运行 -----------------------------")
-        rolldays = inCfg["CROND"]["rolldays"]
-        pairLst = inCfg["PAIRS"].keys()
+    elif len(ARGS) == 0:
+        LOG.info(u"自动日月回归分析程序开始运行 -----------------------------")
+        rolldays = GLOBAL_CONFIG["CROND"]["rolldays"]
+        pairLst = GLOBAL_CONFIG["pairS"].keys()
 
-        for satPair in pairLst:
-            ProjMode1 = len(inCfg["PAIRS"][satPair]["colloc_exe"])
+        for satpair in pairLst:
+            ProjMode1 = len(GLOBAL_CONFIG["pairS"][satpair]["colloc_exe"])
             if ProjMode1 == 0:
                 continue
             for rdays in rolldays:
                 isMonthly = False
                 ymd_day = (datetime.utcnow() - relativedelta(
                     days=int(rdays))).strftime("%Y%m%d")
-                pool.apply_async(run, (satPair, ymd_day, isMonthly))
+                pool.apply_async(main, (satpair, ymd_day, isMonthly))
             # 增加一个月的作业,默认当前月和上一个月
             isMonthly = True
             ymd_month = (datetime.utcnow() - relativedelta(
                 days=int(rolldays[0]))).strftime("%Y%m%d")
             ymd_last_month = (datetime.utcnow() - relativedelta(months=1)).strftime(
                 "%Y%m%d")
-            pool.apply_async(run, (satPair, ymd_month, isMonthly))
-            pool.apply_async(run, (satPair, ymd_last_month, isMonthly))
+            pool.apply_async(main, (satpair, ymd_month, isMonthly))
+            pool.apply_async(main, (satpair, ymd_last_month, isMonthly))
 
         pool.close()
         pool.join()
     else:
-        print "args: error"
+        print HELP_INFO
         sys.exit(-1)

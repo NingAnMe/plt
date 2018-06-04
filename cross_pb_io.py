@@ -121,5 +121,25 @@ def loadYamlCfg(iFile):
     return plt_cfg
 
 
+def load_yaml_file(in_file):
+    """
+    加载 Yaml 文件
+    :param in_file:
+    :return: Yaml 类
+    """
+    if not os.path.isfile(in_file):
+        print "File is not exist: {}".format(in_file)
+        return None
+    try:
+        with open(in_file, 'r') as stream:
+            yaml_data = yaml.load(stream)
+    except IOError as why:
+        print why
+        print "Load yaml file error."
+        yaml_data = None
+
+    return yaml_data
+
+
 if __name__ == '__main__':
     loadYamlCfg('sss')

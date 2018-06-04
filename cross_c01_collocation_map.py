@@ -7,29 +7,19 @@ Created on 2016年1月6日
 """
 import os
 import sys
-import calendar
-from datetime import datetime
-from multiprocessing import Pool, Lock
 
 import numpy as np
-from matplotlib.ticker import MultipleLocator
 
 from configobj import ConfigObj
-from dateutil.relativedelta import relativedelta
-from numpy.lib.polynomial import polyfit
-from numpy.ma.core import std, mean
-from numpy.ma.extras import corrcoef
 
-from DV import dv_pub_3d_dev
-from DV.dv_pub_3d_dev import plt, mpl, mdates, Basemap
-from DV.dv_pub_3d_dev import bias_information, day_data_write, get_bias_data, get_cabr_data, set_tick_font
-from DV.dv_pub_3d_dev import FONT0, FONT_MONO, FONT1
+from DV.dv_pub_3d_dev import plt, Basemap
+from DV.dv_pub_3d_dev import FONT0
 from DM.SNO.dm_sno_cross_calc_map import *
 from PB.CSC.pb_csc_console import LogServer
 from PB import pb_time, pb_io
 from PB.pb_time import is_day_timestamp_and_lon
 
-from plt_io import ReadHDF5, loadYamlCfg
+from cross_pb_io import ReadHDF5, loadYamlCfg
 
 
 def run(pair, ymd):
@@ -52,7 +42,7 @@ def run(pair, ymd):
         return
 
     # 加载绘图配置文件
-    plt_cfg_file = os.path.join(MainPath, "%s_%s_3d.yaml" % (sensor1, sensor2))
+    plt_cfg_file = os.path.join(MAIN_PATH, "cfg", "%s_%s_3d.yaml" % (sensor1, sensor2))
     plt_cfg = loadYamlCfg(plt_cfg_file)
     if plt_cfg is None:
         Log.error("Not find the config file: {}".format(plt_cfg_file))
@@ -148,7 +138,7 @@ def draw_butterfly(sat1Nm, sat2Nm,
     """
     if len(lons) == 0:
         return
-    plt.style.use(os.path.join(dvPath, 'dv_pub_map.mplstyle'))
+    plt.style.use(os.path.join(DV_PATH, 'dv_pub_map.mplstyle'))
 #     COLORS = ['#4cd964', '#1abc9c', '#5ac8fa', '#007aff', '#5856d6']
     COLORS = [RED]
     if map_range[0] and map_range[1]:
@@ -312,75 +302,47 @@ def plot_matchpoint(m, lons, lats, color, alpha=1):
            markeredgecolor=None, mew=0, alpha=alpha)
 
 
+######################### 程序全局入口 ##############################
 if __name__ == "__main__":
     # 获取程序参数接口
-    args = sys.argv[1:]
-    help_info = \
-        u'''
-        [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
-        [参数样例2]：处理所有卫星对
-        '''
-    if '-h' in args:
-        print help_info
+    ARGS = sys.argv[1:]
+    HELP_INFO = \
+        u"""
+        [参数1]：pair 卫星对
+        [参数2]：yyyymmdd 时间
+        [样例]: python app.py pair yyyymmdd
+        """
+    if "-h" in ARGS:
+        print HELP_INFO
         sys.exit(-1)
 
     # 获取程序所在位置，拼接配置文件
-    MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-    ProjPath = os.path.dirname(MainPath)
-    omPath = os.path.dirname(ProjPath)
-    dvPath = os.path.join(os.path.dirname(omPath), 'DV')
-    cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
+    MAIN_PATH, MAIN_FILE = os.path.split(os.path.realpath(__file__))
+    PROJECT_PATH = os.path.dirname(MAIN_PATH)
+    CONFIG_FILE = os.path.join(PROJECT_PATH, "cfg", "global.cfg")
+
+    PYTHON_PATH = os.environ.get("PYTHONPATH")
+    DV_PATH = os.path.join(PYTHON_PATH, "DV")
 
     # 配置不存在预警
-    if not os.path.isfile(cfgFile):
-        print (u'配置文件不存在 %s' % cfgFile)
+    if not os.path.isfile(CONFIG_FILE):
+        print (u"配置文件不存在 %s" % CONFIG_FILE)
         sys.exit(-1)
 
-    # 载入配置文件
-    inCfg = ConfigObj(cfgFile)
-    ORBIT_DIR = inCfg['PATH']['IN']['ORBIT']
-    MATCH_DIR = inCfg['PATH']['MID']['MATCH_DATA']
-    DMS_DIR = inCfg['PATH']['OUT']['DMS']
-    LogPath = inCfg['PATH']['OUT']['LOG']
+    GLOBAL_CONFIG = ConfigObj(CONFIG_FILE)
+    ORBIT_DIR = GLOBAL_CONFIG['PATH']['IN']['ORBIT']
+    MATCH_DIR = GLOBAL_CONFIG['PATH']['MID']['MATCH_DATA']
+    DMS_DIR = GLOBAL_CONFIG['PATH']['OUT']['DMS']
+    LogPath = GLOBAL_CONFIG['PATH']['OUT']['LOG']
     Log = LogServer(LogPath)
 
-    # 获取开机线程的个数，开启线程池。
-    threadNum = inCfg['CROND']['threads']
-    pool = Pool(processes=int(threadNum))
-
-    if len(args) == 2:
+    if len(ARGS) == 2:
         Log.info(u'手动蝴蝶图绘制程序开始运行-----------------------------')
-        satPair = args[0]
-        str_time = args[1]
-        date_s, date_e = pb_time.arg_str2date(str_time)
-        # 定义参数List，传参给线程池
-        args_List = []
+        satPair = ARGS[0]
+        str_time = ARGS[1]
 
-        while date_s <= date_e:
-            ymd_day = date_s.strftime('%Y%m%d')
-            # run(satPair, ymd_day)
-            pool.apply_async(run, (satPair, ymd_day))
-            date_s = date_s + relativedelta(days=1)
+        run(satPair, str_time)
 
-        pool.close()
-        pool.join()
-
-    elif len(args) == 0:
-        Log.info(u'自动蝴蝶图绘制程序开始运行 -----------------------------')
-        rolldays = inCfg['CROND']['rolldays']
-        pairLst = inCfg['PAIRS'].keys()
-        # 定义参数List，传参给线程池
-        args_List = []
-        for satPair in pairLst:
-            ProjMode1 = len(inCfg['PAIRS'][satPair]['colloc_exe'])
-            if ProjMode1 == 0:
-                continue
-            for rdays in rolldays:
-                ymd_day = (datetime.utcnow() - relativedelta(days=int(rdays))).strftime('%Y%m%d')
-                pool.apply_async(run, (satPair, ymd_day))
-
-        pool.close()
-        pool.join()
     else:
         print 'args error'
         sys.exit(-1)

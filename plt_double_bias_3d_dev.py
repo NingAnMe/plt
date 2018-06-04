@@ -19,7 +19,7 @@ from matplotlib.ticker import MultipleLocator
 import pytz
 import calendar
 from multiprocessing import Pool, Lock
-from plt_io import loadYamlCfg
+from cross_pb_io import loadYamlCfg
 
 
 def run(pair1, pair2, date_s, date_e):

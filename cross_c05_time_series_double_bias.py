@@ -1,25 +1,25 @@
 # coding: utf-8
-'''
+"""
 Created on 2016年1月6日
 读取匹配后的NC文件，画散点回归图，生成abr文件
 
 @author: duxiang, zhangtao, anning
-'''
+"""
 import os, sys
 from configobj import ConfigObj
 import netCDF4
 import numpy as np
 from PB import pb_time, pb_io
 from PB.CSC.pb_csc_console import LogServer
-from PB.pb_time import is_day_timestamp_and_lon
+
 from datetime import datetime
 from DV.dv_pub_legacy import plt, mdates, set_tick_font, FONT0
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 from matplotlib.ticker import MultipleLocator
 import pytz
 import calendar
-from multiprocessing import Pool, Lock
-from plt_io import loadYamlCfg
+
+from cross_pb_io import loadYamlCfg
 
 
 def run(pair1, pair2, date_s, date_e):
@@ -46,7 +46,7 @@ def run(pair1, pair2, date_s, date_e):
     sat11, sen11 = satsen11.split('+')
     sat12, sen12 = satsen12.split('+')
 
-    plt_cfg_file = os.path.join(MainPath, '%s_%s_3d.yaml' % (sen11, sen12))
+    plt_cfg_file = os.path.join(MAIN_PATH, "cfg", '%s_%s_3d.yaml' % (sen11, sen12))
     plt_cfg = loadYamlCfg(plt_cfg_file)
 
     chans = plt_cfg["rad-rad"]["chan"]
@@ -83,7 +83,7 @@ def run(pair1, pair2, date_s, date_e):
 #         timestamp_s = max(time1[0], time2[0])
 #         date_s = datetime.fromtimestamp(timestamp_s, tz=pytz.utc)
         sat1, sen1 = satsen11.split("+")
-        date_s = pb_time.ymd2date(inCfg["LUANCH_DATE"][sat1])
+        date_s = pb_time.ymd2date(GLOBAL_CONFIG["LUANCH_DATE"][sat1])
     date_s = pytz.utc.localize(date_s)
     timestamp_s = calendar.timegm(date_s.timetuple())
 
@@ -147,7 +147,7 @@ def plot_tbbias(date_D, bias_D, date_M, bias_M, picPath, title, date_s, date_e):
     """
     画偏差时序折线图
     """
-    plt.style.use(os.path.join(dvPath, 'dv_pub_timeseries.mplstyle'))
+    plt.style.use(os.path.join(DV_PATH, 'dv_pub_timeseries.mplstyle'))
     fig = plt.figure(figsize=(6, 4))
 #     plt.subplots_adjust(left=0.13, right=0.95, bottom=0.11, top=0.97)
 
@@ -312,72 +312,49 @@ def month_mean(dateLst, v):
     monthLst.append(datetime.strptime("%s15" % ym, "%Y%m%d"))
     meanLst.append(np.mean(v[idx]))
     return monthLst, meanLst
+
+
 ######################### 程序全局入口 ##############################
-# 获取程序参数接口
-args = sys.argv[1:]
-help_info = \
-    u'''
-    [参数样例1]：group1  YYYYMMDD-YYYYMMDD
-    [参数样例2]：group1
-    [参数样例3]：处理所有卫星对
-    '''
-if '-h' in args:
-    print help_info
-    sys.exit(-1)
+if __name__ == "__main__":
+    # 获取程序参数接口
+    ARGS = sys.argv[1:]
+    HELP_INFO = \
+        u"""
+        [参数1]：group 卫星对组
+        [参数2]：yyyymmdd 时间
+        [样例]: python app.py group yyyymmdd
+        """
+    if "-h" in ARGS:
+        print HELP_INFO
+        sys.exit(-1)
 
+    # 获取程序所在位置，拼接配置文件
+    MAIN_PATH, MAIN_FILE = os.path.split(os.path.realpath(__file__))
+    PROJECT_PATH = os.path.dirname(MAIN_PATH)
+    CONFIG_FILE = os.path.join(PROJECT_PATH, "cfg", "global.cfg")
 
-# 获取程序所在位置，拼接配置文件
-MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-ProjPath = os.path.dirname(MainPath)
-omPath = os.path.dirname(ProjPath)
-dvPath = os.path.join(os.path.dirname(omPath), 'DV')
-cfgFile = os.path.join(ProjPath, 'cfg', 'global.cfg')
+    PYTHON_PATH = os.environ.get("PYTHONPATH")
+    DV_PATH = os.path.join(PYTHON_PATH, "DV")
 
-# 配置不存在预警
-if not os.path.isfile(cfgFile):
-    print u'配置文件不存在 %s' % cfgFile
-    sys.exit(-1)
-# 载入配置文件
-inCfg = ConfigObj(cfgFile)
-StdNC_DIR = inCfg['PATH']['OUT']['ISN']
-DBB_DIR = inCfg['PATH']['OUT']['DBB']
-LogPath = inCfg['PATH']['OUT']['LOG']
-Log = LogServer(LogPath)
+    # 配置不存在预警
+    if not os.path.isfile(CONFIG_FILE):
+        print (u"配置文件不存在 %s" % CONFIG_FILE)
+        sys.exit(-1)
 
-# 开启进程池
-threadNum = inCfg['CROND']['threads']
-pool = Pool(processes=int(threadNum))
+    GLOBAL_CONFIG = ConfigObj(CONFIG_FILE)
+    StdNC_DIR = GLOBAL_CONFIG['PATH']['OUT']['ISN']
+    DBB_DIR = GLOBAL_CONFIG['PATH']['OUT']['DBB']
+    LogPath = GLOBAL_CONFIG['PATH']['OUT']['LOG']
+    Log = LogServer(LogPath)
 
-if len(args) == 2:
-    Log.info(u'手动长时间双差绘图程序开始运行-----------------------------')
-    satPair = args[0]
-    str_time = args[1]
-    date_s, date_e = pb_time.arg_str2date(str_time)
-#     satPairs = inCfg['DOUBLE_BIAS']['satPair']
-    pair1 = inCfg['DOUBLE_BIAS'][satPair]['pair1']
-    pair2 = inCfg['DOUBLE_BIAS'][satPair]['pair2']
-    run(pair1, pair2, date_s, date_e)
+    if len(ARGS) == 2:
+        satPair = ARGS[0]
+        str_time = ARGS[1]
+        DATE_START, DATE_END = pb_time.arg_str2date(str_time)
+        PAIR_1 = GLOBAL_CONFIG['DOUBLE_BIAS'][satPair]['pair1']
+        PAIR_2 = GLOBAL_CONFIG['DOUBLE_BIAS'][satPair]['pair2']
+        run(PAIR_1, PAIR_2, DATE_START, DATE_END)
 
-elif len(args) == 1:
-    Log.info(u'手动长时间双差绘图程序开始运行-----------------------------')
-    satPair = args[0]
-    pair1 = inCfg['DOUBLE_BIAS'][satPair]['pair1']
-    pair2 = inCfg['DOUBLE_BIAS'][satPair]['pair2']
-    run(pair1, pair2, None, None)
-
-elif len(args) == 0:
-    Log.info(u'自动长时间双差绘图程序开始运行 -----------------------------')
-    rolldays = inCfg['CROND']['rolldays']
-    pairLst = inCfg['DOUBLE_BIAS'].keys()
-    # 定义参数List，传参给线程池
-    args_List = []
-    for satPair in pairLst:
-        pair1 = inCfg['DOUBLE_BIAS'][satPair]['pair1']
-        pair2 = inCfg['DOUBLE_BIAS'][satPair]['pair2']
-        pool.apply_async(run, (pair1, pair2, None, None))
-    pool.close()
-    pool.join()
-
-else:
-    print 'args error'
-    sys.exit(-1)
+    else:
+        print HELP_INFO
+        sys.exit(-1)

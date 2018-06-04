@@ -8,11 +8,9 @@ Created on 2016年1月6日
 import os
 import sys
 import calendar
-from datetime import datetime
-from multiprocessing import Pool, Lock
+from multiprocessing import Lock
 
 import numpy as np
-from matplotlib.ticker import MultipleLocator
 
 from configobj import ConfigObj
 from dateutil.relativedelta import relativedelta
@@ -20,10 +18,10 @@ from numpy.lib.polynomial import polyfit
 from numpy.ma.core import std, mean
 from numpy.ma.extras import corrcoef
 
-from DV import dv_pub_3d_dev
-from DV.dv_pub_3d_dev import plt, mpl, mdates, Basemap
-from DV.dv_pub_3d_dev import bias_information, day_data_write, get_bias_data, get_cabr_data, set_tick_font
-from DV.dv_pub_3d_dev import FONT0, FONT_MONO, FONT1
+from DV import dv_pub_3d
+from DV.dv_pub_3d import plt
+from DV.dv_pub_3d import bias_information, day_data_write, get_bias_data, get_cabr_data
+from DV.dv_pub_3d import FONT1
 from DM.SNO.dm_sno_cross_calc_map import RED, BLUE, EDGE_GRAY, ORG_NAME, mpatches
 from PB.CSC.pb_csc_console import LogServer
 from PB import pb_time, pb_io
@@ -50,17 +48,17 @@ def run(pair, ymd, is_monthly):
     elif "FY3" in part1:
         Type = "LEOLEO"
     else:
-        Log.error("Cant distinguish the satellite type")
+        LOG.error("Cant distinguish the satellite type")
         return
 
     # 加载绘图配置文件
-    plt_cfg_file = os.path.join(MainPath, "%s_%s_3d.yaml" % (sensor1, sensor2))
+    plt_cfg_file = os.path.join(MAIN_PATH, "cfg", "%s_%s_3d.yaml" % (sensor1, sensor2))
     plt_cfg = loadYamlCfg(plt_cfg_file)
     if plt_cfg is None:
-        Log.error("Not find the config file: {}".format(plt_cfg_file))
+        LOG.error("Not find the config file: {}".format(plt_cfg_file))
         return
 
-    Log.info(u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(pair, ymd))
+    LOG.info(u"----- Start Drawing Regression-Pic, PAIR: {}, YMD: {} -----".format(pair, ymd))
 
     for each in plt_cfg["regression"]:
         dict_cabr = {}
@@ -86,7 +84,7 @@ def run(pair, ymd, is_monthly):
                     Day_Night.remove(t)
 
         for idx, chan in enumerate(plt_cfg[each]["chan"]):
-            Log.info(u"Start Drawing {} Channel {}".format(each, chan))
+            LOG.info(u"Start Drawing {} Channel {}".format(each, chan))
             oneHDF5 = ReadHDF5()
             num_file = PERIOD
             for daydelta in xrange(PERIOD):
@@ -94,16 +92,16 @@ def run(pair, ymd, is_monthly):
                 hdf5_name = "COLLOC+%sIR,%s_C_BABJ_%s.hdf5" % (Type, pair, cur_ymd)
                 filefullpath = os.path.join(MATCH_DIR, pair, hdf5_name)
                 if not os.path.isfile(filefullpath):
-                    Log.info(u"File not found: {}".format(filefullpath))
+                    LOG.info(u"File not found: {}".format(filefullpath))
                     num_file -= 1
                     continue
                 if not oneHDF5.LoadData(filefullpath, chan):
-                    Log.error("Error occur when reading %s of %s" % (chan, filefullpath))
+                    LOG.error("Error occur when reading %s of %s" % (chan, filefullpath))
             if num_file == 0:
-                Log.error(u"No file found.")
+                LOG.error(u"No file found.")
                 continue
             elif num_file != PERIOD:
-                Log.error(u"{} of {} file(s) found.".format(num_file, PERIOD))
+                LOG.error(u"{} of {} file(s) found.".format(num_file, PERIOD))
 
             if is_monthly:
                 str_time = ymd[:6]
@@ -183,7 +181,7 @@ def run(pair, ymd, is_monthly):
             elif "dn" in xname:
                 x = oneHDF5.dn1
             else:
-                Log.error("Can't plot %s" % each)
+                LOG.error("Can't plot %s" % each)
                 continue
             if "rad" in yname:
                 y = oneHDF5.rad2
@@ -192,7 +190,7 @@ def run(pair, ymd, is_monthly):
             elif "ref" in yname:
                 y = oneHDF5.ref2
             else:
-                Log.error("Can't plot %s" % each)
+                LOG.error("Can't plot %s" % each)
                 continue
 
             if "rad" in xname and "rad" in yname:
@@ -226,7 +224,7 @@ def run(pair, ymd, is_monthly):
 
             # 对样本点数量进行判断，如果样本点少于 100 个，则不进行绘制
             if x.size < 100:
-                Log.error("Not enough match point to draw: {}, {}".format(each, chan))
+                LOG.error("Not enough match point to draw: {}, {}".format(each, chan))
                 if "all" in Day_Night:
                     dict_cabr[o_name][chan] = [0, np.NaN, np.NaN, np.NaN]
                     dict_bias[xname][chan] = [np.NaN, np.NaN]
@@ -360,7 +358,8 @@ def write_cabr(channel, part1, part2, o_name, ymd,
                 part1, part2, o_name, chan, day_or_night))
 
         # 写入日数据
-        title_daily = ("{:15}  " * 5).format("YMD", "Count", "Slope", "Intercept", "RSquared") + "\n"
+        title_daily = ("{:15}  " * 5).format("YMD", "Count", "Slope", "Intercept",
+                                             "RSquared") + "\n"
         c, a, b, r = dict_cabr[o_name][chan]
         data_daily = ("{:15}  " * 5).format(ymd, c, a, b, r) + "\n"
         day_data_write(title_daily, data_daily, file_name_daily)
@@ -368,7 +367,8 @@ def write_cabr(channel, part1, part2, o_name, ymd,
         # 写入月数据
         cabr_data = get_cabr_data(file_name_daily)
         title_monthly = ("{:15}  " * 8).format("YMD", "Count", "Slope", "Slope_STD",
-                                               "Intercept", "Intercept_STD", "RSquared", "RSquared_STD") + "\n"
+                                               "Intercept", "Intercept_STD", "RSquared",
+                                               "RSquared_STD") + "\n"
         date_data = cabr_data["date"]
 
         if len(date_data) <= 2:  # 如果小于2天的数据，不计算月平均
@@ -396,7 +396,8 @@ def write_cabr(channel, part1, part2, o_name, ymd,
             intercept_std_monthly = data[6]
             rsquared_std_monthly = data[7]
 
-            data_str = ("{:15}  " * 8).format(ymd_monthly, count_monthly, slope_mean_monthly, slope_std_monthly,
+            data_str = ("{:15}  " * 8).format(ymd_monthly, count_monthly, slope_mean_monthly,
+                                              slope_std_monthly,
                                               intercept_mean_monthly, intercept_std_monthly,
                                               rsquared_mean_monthly, rsquared_std_monthly) + "\n"
             day_data_write(title_monthly, data_str, file_name_monthly)
@@ -559,7 +560,7 @@ def month_average(day_date, day_data):
 def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
          xname, xname_l, xunit, xmin, xmax, yname, yname_l, yunit, ymin, ymax,
          is_diagonal, is_monthly):
-    plt.style.use(os.path.join(dvPath, "dv_pub_regression_dev.mplstyle"))
+    plt.style.use(os.path.join(DV_PATH, "dv_pub_regression.mplstyle"))
 
     # 过滤 正负 delta+8 倍 std 的杂点 ------------------------
     w = 1.0 / weight if weight is not None else None
@@ -642,7 +643,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         scatter_point = {"scatter_alpha": 0.8}
 
-        dv_pub_3d_dev.draw_regression(
+        dv_pub_3d.draw_regression(
             ax1, x, y, label=regress_label, ax_annotate=regress_annotate, tick=regress_tick,
             axislimit=regress_axislimit, locator=regress_locator,
             diagonal=regress_diagonal, regressline=regress_regressline,
@@ -753,7 +754,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         # 偏差回归线配置
         regressline = {"line_color": "r", "line_width": 1.2}
-        dv_pub_3d_dev.draw_distribution(ax2, x, y, label=distri_label,
+        dv_pub_3d.draw_distribution(ax2, x, y, label=distri_label,
                                         ax_annotate=distri_annotate,
                                         tick=distri_tick,
                                         axislimit=distri_limit,
@@ -796,12 +797,12 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         histogram_tick = {"fontsize": 14, }
 
-        dv_pub_3d_dev.draw_histogram(
+        dv_pub_3d.draw_histogram(
             ax3, x, label=histogram_label, locator=histogram_locator, tick=histogram_tick,
             axislimit=histogram_axislimit, histogram=histogram_x,
         )
 
-        dv_pub_3d_dev.draw_histogram(
+        dv_pub_3d.draw_histogram(
             ax3, y, label=histogram_label, locator=histogram_locator, tick=histogram_tick,
             axislimit=histogram_axislimit, histogram=histogram_y,
         )
@@ -866,7 +867,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
 
         scatter_point = {"scatter_alpha": 0.8}
 
-        dv_pub_3d_dev.draw_regression(
+        dv_pub_3d.draw_regression(
             ax1, x, y, label=regress_label, ax_annotate=regress_annotate, tick=regress_tick,
             axislimit=regress_axislimit, locator=regress_locator,
             diagonal=regress_diagonal, regressline=regress_regressline,
@@ -935,7 +936,7 @@ def plot(x, y, weight, o_file, num_file, part1, part2, chan, ymd,
         density = {
             "size": 5, "marker": "o", "alpha": 1
         }
-        dv_pub_3d_dev.draw_regression(
+        dv_pub_3d.draw_regression(
             ax1, x, y, label=density_label, ax_annotate=density_annotate, tick=density_tick,
             axislimit=density_axislimit, locator=density_locator,
             diagonal=density_diagonal, regressline=density_regressline,
@@ -989,93 +990,54 @@ def G_reg1d(xx, yy, ww=None):
 ######################### 程序全局入口 ##############################
 if __name__ == "__main__":
     # 获取程序参数接口
-    args = sys.argv[1:]
-    help_info = \
+    ARGS = sys.argv[1:]
+    HELP_INFO = \
         u"""
-        [参数样例1]：SAT1+SENSOR1_SAT2+SENSOR2  YYYYMMDD-YYYYMMDD
-        [参数样例2]：处理所有卫星对
+        [参数1]：pair 卫星对
+        [参数2]：yyyymmdd 时间
+        [样例]: python app.py pair yyyymmdd
         """
-    if "-h" in args:
-        print help_info
+    if "-h" in ARGS:
+        print HELP_INFO
         sys.exit(-1)
 
     # 获取程序所在位置，拼接配置文件
-    MainPath, MainFile = os.path.split(os.path.realpath(__file__))
-    ProjPath = os.path.dirname(MainPath)
-    omPath = os.path.dirname(ProjPath)
-    dvPath = os.path.join(os.path.dirname(omPath), "DV")
-    cfgFile = os.path.join(ProjPath, "cfg", "global.cfg")
+    MAIN_PATH, MAIN_FILE = os.path.split(os.path.realpath(__file__))
+    PROJECT_PATH = os.path.dirname(MAIN_PATH)
+    CONFIG_FILE = os.path.join(PROJECT_PATH, "cfg", "global.cfg")
+
+    PYTHON_PATH = os.environ.get("PYTHONPATH")
+    DV_PATH = os.path.join(PYTHON_PATH, "DV")
 
     # 配置不存在预警
-    if not os.path.isfile(cfgFile):
-        print (u"配置文件不存在 %s" % cfgFile)
+    if not os.path.isfile(CONFIG_FILE):
+        print (u"配置文件不存在 %s" % CONFIG_FILE)
         sys.exit(-1)
 
     # 载入配置文件
-    inCfg = ConfigObj(cfgFile)
-    MATCH_DIR = inCfg["PATH"]["MID"]["MATCH_DATA"]
-    DRA_DIR = inCfg["PATH"]["OUT"]["DRA"]
-    MRA_DIR = inCfg["PATH"]["OUT"]["MRA"]
-    ABR_DIR = inCfg["PATH"]["OUT"]["ABR"]
-    LogPath = inCfg["PATH"]["OUT"]["LOG"]
-    Log = LogServer(LogPath)
+    GLOBAL_CONFIG = ConfigObj(CONFIG_FILE)
+    MATCH_DIR = GLOBAL_CONFIG["PATH"]["MID"]["MATCH_DATA"]
+    DRA_DIR = GLOBAL_CONFIG["PATH"]["OUT"]["DRA"]
+    MRA_DIR = GLOBAL_CONFIG["PATH"]["OUT"]["MRA"]
+    ABR_DIR = GLOBAL_CONFIG["PATH"]["OUT"]["ABR"]
+    LOG_PATH = GLOBAL_CONFIG["PATH"]["OUT"]["LOG"]
+    LOG = LogServer(LOG_PATH)
 
-    # 开启进程池
-    # threadNum = inCfg["CROND"]["threads"]
-    threadNum = "10"
-    pool = Pool(processes=int(threadNum))
+    if len(ARGS) == 2:
+        PAIR = ARGS[0]
+        YMD = ARGS[1]
 
-    if len(args) == 2:
-        Log.info(u"手动日月回归分析程序开始运行-----------------------------")
-        satPair = args[0]
-        str_time = args[1]
-        date_s, date_e = pb_time.arg_str2date(str_time)
-        isMonthly = False
-        if len(str_time) == 13:
-            isMonthly = True
-            timeStep = relativedelta(months=1)
-        elif len(str_time) == 17:
-            timeStep = relativedelta(days=1)
+        # 判断是日回归还是月回归
+        if len(YMD) == 13:
+            IS_MONTHLY = True
+        elif len(YMD) == 17:
+            IS_MONTHLY = False
         else:
-            print "time format error  yyyymmdd-yyyymmdd or yyyymm-yyyymm"
+            print HELP_INFO
             sys.exit(-1)
-        # 定义参数List，传参给线程池
-        args_List = []
-
-        while date_s <= date_e:
-            ymd_day = date_s.strftime("%Y%m%d")
-            run(satPair, ymd_day, isMonthly)
-            # pool.apply_async(run, (satPair, ymd_day, isMonthly))
-            date_s = date_s + timeStep
-
-        pool.close()
-        pool.join()
-
-    elif len(args) == 0:
-        Log.info(u"自动日月回归分析程序开始运行 -----------------------------")
-        rolldays = inCfg["CROND"]["rolldays"]
-        pairLst = inCfg["PAIRS"].keys()
-
-        for satPair in pairLst:
-            ProjMode1 = len(inCfg["PAIRS"][satPair]["colloc_exe"])
-            if ProjMode1 == 0:
-                continue
-            for rdays in rolldays:
-                isMonthly = False
-                ymd_day = (datetime.utcnow() - relativedelta(
-                    days=int(rdays))).strftime("%Y%m%d")
-                pool.apply_async(run, (satPair, ymd_day, isMonthly))
-            # 增加一个月的作业,默认当前月和上一个月
-            isMonthly = True
-            ymd_month = (datetime.utcnow() - relativedelta(
-                days=int(rolldays[0]))).strftime("%Y%m%d")
-            ymd_last_month = (datetime.utcnow() - relativedelta(months=1)).strftime(
-                "%Y%m%d")
-            pool.apply_async(run, (satPair, ymd_month, isMonthly))
-            pool.apply_async(run, (satPair, ymd_last_month, isMonthly))
-
-        pool.close()
-        pool.join()
+        
+        # 开始运行
+        run(PAIR, YMD, IS_MONTHLY)
     else:
-        print "args: error"
+        print HELP_INFO
         sys.exit(-1)
